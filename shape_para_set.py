@@ -9,6 +9,7 @@ from pcbnew import *
 
 #3 TODO:对于圆角矩形自动根据圆心添加安装孔定位点 在文档层
 #1：根据屏幕像素自适应像素大小 TODO:调整布局方式
+# 分段的边框添加到一个组里面避免移动困难
 # TODO：添加之后的边框添加尺寸标注
 # TODO:1 单位可选择 
 # TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
@@ -203,7 +204,7 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 shapeRboxLable = '外型类型'
                 self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
                 # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
-                wx.Dialog.__init__(self, parent, id=-1, title=funcName+version, size=Em(60,20),
+                wx.Dialog.__init__(self, parent, id=-1, title=funcName+version, size=Em(44,14),
                                    style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
                 # wx.Dialog.__init__(
                 #     self, parent, title=f'Fillet board edges',
@@ -287,12 +288,13 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickConfirmBtn)
 
                 testText = '刷新测试'
-                self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,15))#,size=DefaultSize)
+                self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(28,10))#,size=DefaultSize)
                 self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
 
-                testText = 'ScriptEdit'
-                self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
-                self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
+                # testText = 'ScriptEdit'
+                # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
+                # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
+
                 # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
             def showShapeSetInterface(self,shapeKind):
                 # alert('select:%d'%self.shapeRbox.GetSelection())
