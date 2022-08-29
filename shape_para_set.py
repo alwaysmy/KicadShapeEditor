@@ -7,18 +7,20 @@ from pcbnew import *
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
 #TODO list：
 
-#3 TODO:对于圆角矩形自动根据圆心添加安装孔定位点 在文档层
+#3 等后面复选框没有bug了在看看文档层能不能吸附圆心
 #1：根据屏幕像素自适应像素大小 TODO:调整布局方式
-# 分段的边框添加到一个组里面避免移动困难
+
 # TODO：添加之后的边框添加尺寸标注
 # TODO:1 单位可选择 
 # TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
 # TODO :让添加的层可选
-# TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 
+# TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面
 # TODO:添加正多边形的添加
 # TODO： 添加预览界面
 # 0 语言忘差不多了，写法得看看了
 #2 todo:添加脚本功能类似openscad编辑边框形状
+# 分段的边框添加到一个组里面避免移动困难（可选）
+# 圆心标记功能添加到高级里面可以取消
 UNITS = ["mm", "in"]
 multiplier = 1000000#KiCad中数字的单位是10^-6 mm
 #
@@ -161,8 +163,23 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     shape_seg_D.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
     boardObj.Add(shape_seg_D)
     #继承 EDA_SHAPE的属性可以添加圆弧和贝塞尔曲线       
+    # 添加用户注释层圆角的圆心：
+    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
+    # # 添加在边框层的圆心
+    # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
+    # 添加在第一层铜皮层的圆心 #这一层目前可以自动吸附，所以添加了这个，不然不应该影响电路的元素
+    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
 #添加圆形
-def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer):
+def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLocked=False):
     boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
@@ -175,7 +192,8 @@ def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer):
 
     shape_segments.SetWidth(segmentWidth)#250000
     shape_segments.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
-
+    shape_segments.SetFilled(isFill)
+    shape_segments.SetLocked(isLocked)
     
     # TODO :然后添加一个圆心
     # if hasattr(shape_segments,'SetTimeStamp'):   #不要也没事
@@ -274,6 +292,8 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 ytxt = "YL"
                 self.Ytext = wx.StaticText(self.panel, wx.ID_ANY, label=ytxt, pos=Em(14,7))#, size, style)
                     # 圆角矩形的圆角大小
+                # sizetxt = '半径'
+                # self.Sizetext = wx.StaticText(self.panel, wx.ID_ANY, label=sizetxt, pos=Em(2,6))#, size, style)
                 r_angle_txt = "R:"
                 self.R_angle_text = wx.StaticText(self.panel, wx.ID_ANY, label=r_angle_txt, pos=Em(2,9))#, size, style)
                 
@@ -287,7 +307,7 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=confirmText,pos=Em(16,10))#,size=DefaultSize)
                 self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickConfirmBtn)
 
-                testText = '刷新测试'
+                testText = '刷新显示'
                 self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(28,10))#,size=DefaultSize)
                 self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
 
@@ -390,6 +410,7 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 elif self.theShapeSelection == 2:
                     r_circle=int(self.length_Input.GetValue())*multiplier
                     AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer)
+                    AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False)#添加一个圆心标记
                     # pass
                 elif self.theShapeSelection == 3:
 
