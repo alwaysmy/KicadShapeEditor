@@ -5,11 +5,11 @@ import wx
 from pcbnew import *
 
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
+
 #TODO list：
 
-#3 等后面复选框没有bug了在看看文档层能不能吸附圆心
-#1：根据屏幕像素自适应像素大小 TODO:调整布局方式
 
+#1：根据屏幕像素自适应像素大小 TODO:调整布局方式
 # TODO：添加之后的边框添加尺寸标注
 # TODO:1 单位可选择 
 # TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
@@ -17,6 +17,7 @@ from pcbnew import *
 # TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面
 # TODO:添加正多边形的添加
 # TODO： 添加预览界面
+#3 等后面复选框没有bug了在看看文档层能不能吸附圆心，这里确认了圆心基本不能自动吸附在不对其网格的点上，所以这个功能暂时不做了
 # 0 语言忘差不多了，写法得看看了
 #2 todo:添加脚本功能类似openscad编辑边框形状
 # 分段的边框添加到一个组里面避免移动困难（可选）
@@ -27,7 +28,7 @@ multiplier = 1000000#KiCad中数字的单位是10^-6 mm
 def alert(s, icon=0):
     wx.MessageBox(s, 'xxxtitle', wx.OK|icon)
 
-chsize = (10,20)
+chsize = (10,20)#这个最好改掉
 def InitEm():
     global chsize
     dc=wx.ScreenDC()
@@ -39,7 +40,7 @@ def InitEm():
 def Em(x,y,dx=0,dy=0):
     return (chsize[0]*x+dx, chsize[1]*y+dy)
 
-
+# 这里这些是主要的shape类型
 # SHAPE_T_ARC pcbnew
 # SHAPE_T_asString pcbnew::EDA_SHAPE
 # SHAPE_T_BEZIER pcbnew
