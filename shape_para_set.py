@@ -14,14 +14,19 @@ from pcbnew import *
 # TODO:1 单位可选择 
 # TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
 # TODO :让添加的层可选
+# TODO: 增加选项，添加边框的时候删除原来的边框
 # TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面
 # TODO:添加正多边形的添加
 # TODO： 添加预览界面
-#3 等后面复选框没有bug了在看看文档层能不能吸附圆心，这里确认了圆心基本不能自动吸附在不对其网格的点上，所以这个功能暂时不做了
+# TODO：添加高级选项功能
+# TODO :添加功能配置记录，用来存放配置和用来每次打开的时候读取上一次保存的记录
+#3 等后面复选框没有bug了在看看文档层能不能吸附圆心 更新：这里确认了圆心基本不能自动吸附在不对其网格的点上，功能本来就是为了摆放安装孔方便，所以这个功能暂时不做了
 # 0 语言忘差不多了，写法得看看了
 #2 todo:添加脚本功能类似openscad编辑边框形状
 # 分段的边框添加到一个组里面避免移动困难（可选）
 # 圆心标记功能添加到高级里面可以取消
+
+## 
 UNITS = ["mm", "in"]
 multiplier = 1000000#KiCad中数字的单位是10^-6 mm
 #
@@ -175,10 +180,10 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
     # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
     # 添加在第一层铜皮层的圆心 #这一层目前可以自动吸附，所以添加了这个，不然不应该影响电路的元素
-    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
-    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
-    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
-    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
+    # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
 #添加圆形
 def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLocked=False):
     boardObj = pcbnew.GetBoard()
@@ -392,24 +397,24 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 self.boardObj = pcbnew.GetBoard()
                 # pcbShape = pcbnew.PCB_SHAPE(self.boardObj)
 
-                x0=int(self.PosX_Input.GetValue())*multiplier
-                y0=int(self.PosY_Input.GetValue())*multiplier
+                x0=float(self.PosX_Input.GetValue())*multiplier
+                y0=float(self.PosY_Input.GetValue())*multiplier
                 linewidth = 250000
                 # alert('edge:%d'%self.theShapeSelection)
                 if(self.theShapeSelection == 0):
-                    x1=int(self.length_Input.GetValue())*multiplier
-                    y1=int(self.width_Input.GetValue())*multiplier
+                    x1=float(self.length_Input.GetValue())*multiplier
+                    y1=float(self.width_Input.GetValue())*multiplier
                     # linewidth = float(multiplier)*self.lineWidth#TODO:不知道为什么这样会算不出来宽度，也没报错就运行不了      
                     # alert('anything')
                     # alert('edge:%s'%type(self.lineWidth))
                     AddRectShape(x1,y1,linewidth,x0,y0,self.theLayer)
                 elif self.theShapeSelection == 1:
-                    x1=int(self.length_Input.GetValue())*multiplier
-                    y1=int(self.width_Input.GetValue())*multiplier
-                    ra = int(self.angleRadius_Input.GetValue())*multiplier
+                    x1=float(self.length_Input.GetValue())*multiplier
+                    y1=float(self.width_Input.GetValue())*multiplier
+                    ra = float(self.angleRadius_Input.GetValue())*multiplier
                     AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer)
                 elif self.theShapeSelection == 2:
-                    r_circle=int(self.length_Input.GetValue())*multiplier
+                    r_circle=float(self.length_Input.GetValue())*multiplier
                     AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer)
                     AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False)#添加一个圆心标记
                     # pass
