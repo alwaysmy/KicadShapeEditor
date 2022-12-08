@@ -33,36 +33,22 @@ from pcbnew import *
 # 2022 12 之前的就不说了
 # 1、更新默认线宽为0.1mm，因为kicad的默认是这么多，以免看着不舒服。
 # 2、又该回去了默认线宽，因为jlc开槽精度到不了那么大，太细的线会有错觉（
+# 3、分离了部分ui代码，剩下慢慢搞吧。
+# 4、准备添加一个右键菜单，但是没搞出来。
 # Fixed：
-# #TODO:不知道为什么这样会算不出来宽度，也没报错就运行不了  ---输入线宽需要是整数
+# 1#TODO:不知道为什么这样会算不出来宽度，也没报错就运行不了  --- 输入线宽需要是整数，已经修复，后续可以添加调整线宽的功能
+# 2修复了删除被添加的边框后被回显出来的bug（改dialog的显示方法为show而不是showModal，摸不着头脑
+# 但是保留刷新按键，方便一些别的改文件操作
+# 3 添加打开插件就先刷新pcb的代码，避免有文件修改
+# 
 UNITS = ["mm", "in"]
 g_multiplier = 1000000#KiCad中数字的单位是10^-6 mm 所以要乘回去
+
 #
 def alert(s, icon=0):
     wx.MessageBox(s, '阿巴阿巴title', wx.OK|icon)
 
-# 用来调整布局的
-#InitEm 函数首先定义了一个全局变量 chsize，
-# 并将其初始化为 (10,20)。
-# 然后它创建一个 wx.ScreenDC 对象，
-# 这个对象可以用来在屏幕上绘图。
-# 接着，它创建一个字体对象，
-# 并将这个字体设置到 wx.ScreenDC 对象上
-chsize = (10,20)#这个最好改掉
-def InitEm():
-    global chsize
-    dc=wx.ScreenDC()
-    font=wx.Font(pointSize=10,family=wx.DEFAULT,style=wx.NORMAL,weight=wx.NORMAL)
-    dc.SetFont(font)
-    # 获取 "M" 这个字符的宽和高
-    tx=dc.GetTextExtent("M")
-    # 将 chsize 全局变量的值
-    #设置为字符宽度和高度的 1.5 倍。
-    chsize=(tx[0]*1.2,tx[1]*1.5)
 
-
-def Em(x,y,dx=0,dy=0):
-    return (chsize[0]*x+dx, chsize[1]*y+dy)
 
 # 这里这些是主要的shape类型
 # SHAPE_T_ARC pcbnew
@@ -230,6 +216,264 @@ def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLoc
 # 这个还没做TODO,添加用openscad描述的自定义形状（不实用）
 def AddScadShape(segmentWidth,chosenLayer):
     pass
+
+# class BoardOperation():
+
+class Dialog(wx.Dialog):
+    chsize = (10,20)#这个最好改掉，不能放到init里面，会失效
+    # Borderop = BoardOperation()
+    # Borderop.onClickConfirmBtn()
+    def __init__(self, parent):
+        # 用来调整布局的
+        #InitEm 函数首先定义了一个全局变量 chsize，
+        # 并将其初始化为 (10,20)。
+        # 然后它创建一个 wx.ScreenDC 对象，
+        # 这个对象可以用来在屏幕上绘图。
+        # 接着，它创建一个字体对象，
+        # 并将这个字体设置到 wx.ScreenDC 对象上
+        def InitEm():
+            global chsize
+            dc=wx.ScreenDC()
+            font=wx.Font(pointSize=10,family=wx.DEFAULT,style=wx.NORMAL,weight=wx.NORMAL)
+            dc.SetFont(font)
+            # 获取 "M" 这个字符的宽和高
+            tx=dc.GetTextExtent("M")
+            # 将 chsize 全局变量的值
+            #设置为字符宽度和高度的 1.5 倍。
+            chsize=(tx[0]*1.1,tx[1]*1.5)
+        def Em(x,y,dx=0,dy=0):
+            return (chsize[0]*x+dx, chsize[1]*y+dy)
+        #-----------------------设定窗口信息------------------
+        InitEm()
+        funcName = '外型生成'#illet board edges
+        version='v0.10001'
+        shapeRboxLable = '外型类型'
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
+        # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
+        wx.Dialog.__init__(self, parent, id=-1, 
+                            title=funcName+version, 
+                            size=Em(44,14),
+                            style=wx.DEFAULT_DIALOG_STYLE 
+                            | wx.RESIZE_BORDER
+                            | wx.DIALOG_NO_PARENT
+                            # | wx.FRAME_EX_CONTEXTHELP
+                            )
+
+        # self.Bind(wx.EVT_CLOSE, self.OnClose, id=self.GetId())
+        icon=wx.Icon(self.icon_file_name)
+        self.SetIcon(icon)#显示Logo图标
+        self.panel = wx.Panel(self) #添加一个panel容纳元素 
+
+        self.m_menu1 = wx.Menu()
+        self.m_menuItem1 = wx.MenuItem( self.m_menu1, wx.ID_ANY, u"MyMenuItem", wx.EmptyString, wx.ITEM_NORMAL )
+        self.m_menu1.Append( self.m_menuItem1 )
+
+        self.m_menu1.AppendSeparator()
+
+        self.m_menuItem2 = wx.MenuItem( self.m_menu1, wx.ID_ANY, u"MyMenuItem", wx.EmptyString, wx.ITEM_NORMAL )
+        self.m_menu1.Append( self.m_menuItem2 )
+        self.Bind( wx.EVT_RIGHT_DOWN, self.OnContextMenu )
+        # --------------根据板子信息自动初始化一些数据--TODO:这里后面写----
+        #边框中心位置（或者左上角）边框默认大小
+        center_posX = 0
+        center_posY = 0
+        X_length = 100
+        Y_length = 100
+        R_value = 5
+        #-------------下面是UI部分---------------------
+        # wx.StaticText(self.panel, wx.ID_ANY, getstr('LABEL'), size=Em(70,1), pos=Em(1,1))
+        # wx.StaticText(self.panel, wx.ID_ANY, getstr('MENUFACTURERS'),size=Em(14,1), pos=Em(1,2.5))
+        # wx.StaticText(self.panel, wx.ID_ANY, getstr('MENUFACTURERS'),size=Em(14,1), pos=Em(1,2.5))
+        #if in chinese,四个选项包含
+        shapeList = ['矩形', '圆角矩形', '圆形','多边形导入'] 
+        shapeList = ['矩形', '圆角矩形', '圆形','脚本生成']#ScriptEdit
+        self.theShapeSelection = 0
+        self.lineWidth = 0.254 # mm 
+        # self.lineWidth = 0.1 #mm
+        self.theLayer = pcbnew.Edge_Cuts
+        self.shapeRbox = wx.RadioBox(self.panel,  wx.ID_ANY, label = shapeRboxLable ,pos=Em(1,1), choices = shapeList,
+            majorDimension = 1, style = wx.RA_SPECIFY_ROWS) 
+                # self.panel.o
+
+        # 板框类型选择radioBox， 绑定函数onSelectShape
+        self.shapeRbox.SetSelection(self.theShapeSelection)#默认选择矩形
+        self.shapeRbox.Bind(wx.EVT_RADIOBOX,self.onSelectShape)#绑定动作到onSeletShape函数
+        #(self, parent, id=ID_ANY, value=EmptyString, pos=DefaultPosition, size=DefaultSize, style=0, validator=DefaultValidator, name=TextCtrlNameStr 
+
+        # ---输入数据单位可选，同时读取板设置自动选择mm mil
+        #X坐标输入框
+        self.PosX_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posX),pos=Em(2+2,5),size=Em(8,1),name='x')
+        #Y坐标输入框
+        self.PosY_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posY),pos=Em(14+2,5),size=Em(8,1),name='y')
+
+        #X长度输入框
+        #圆形的半径直接取上面的X
+        self.length_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(X_length),pos=Em(2+2,7),size=Em(8,1),name='xl')
+        #宽度输入框Y
+        self.width_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(Y_length),pos=Em(14+2,7),size=Em(8,1),name='yl')
+        # 圆角半径生成参数
+        self.angleRadius_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(R_value),pos=Em(2+2,9),size=Em(8,1),name='rvalue')
+        # alert('select:%d'%self.shapeRbox.GetSelection())
+        # ----------文本----------
+        # X坐标和Y坐标文本
+        xytxt = '位置坐标'
+        self.Xytext = wx.StaticText(self.panel, wx.ID_ANY, label=xytxt, pos=Em(2,4))#, size, style)
+        xtxt = "X:"
+        self.Xtext = wx.StaticText(self.panel, wx.ID_ANY, label=xtxt, pos=Em(2,5))#, size, style)
+        ytxt = "Y:"
+        self.Ytext = wx.StaticText(self.panel, wx.ID_ANY, label=ytxt, pos=Em(14,5))#, size, style)
+
+        # 参数文本
+        sizetxt = '尺寸'
+        self.Sizetext = wx.StaticText(self.panel, wx.ID_ANY, label=sizetxt, pos=Em(2,6))#, size, style)
+        xtxt = "XL"
+        self.Xtext = wx.StaticText(self.panel, wx.ID_ANY, label=xtxt, pos=Em(2,7))#, size, style)
+        Rtxt = "R:"
+        self.Rtext = wx.StaticText(self.panel, wx.ID_ANY, label=Rtxt, pos=Em(2,7))#, size, style)
+        ytxt = "YL"
+        self.Ytext = wx.StaticText(self.panel, wx.ID_ANY, label=ytxt, pos=Em(14,7))#, size, style)
+            # 圆角矩形的圆角大小
+        # sizetxt = '半径'
+        # self.Sizetext = wx.StaticText(self.panel, wx.ID_ANY, label=sizetxt, pos=Em(2,6))#, size, style)
+        r_angle_txt = "R:"
+        self.R_angle_text = wx.StaticText(self.panel, wx.ID_ANY, label=r_angle_txt, pos=Em(2,9))#, size, style)
+        
+        #-------需要默认隐藏的项目
+        self.Rtext.Hide()
+        self.R_angle_text.Hide()
+        self.angleRadius_Input.Hide()
+
+        # ---------按钮----------
+        confirmText = '应用'
+        self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=confirmText,pos=Em(16,10))#,size=DefaultSize)
+        self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickConfirmBtn)
+
+        testText = '刷新显示'
+        self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(28,10))#,size=DefaultSize)
+        self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
+
+        # testText = 'ScriptEdit'
+        # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
+        # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
+
+        # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
+        # 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
+    def onClickConfirmBtn(self,event):
+        #应用板框画到板子上
+        # (gr_rect (start 215.9 60.96) (end 228.6 71.12) (layer "Edge.Cuts") (width 0.2) (fill none) (tstamp 1799c71f-013d-402a-b710-c5585561a246))
+        # (gr_line (start 196.85 53.34) (end 229.87 53.34) (layer "Edge.Cuts") (width 0.2) (tstamp cf625e85-a2c0-4557-8b5f-dc6b2e43c20d))
+        self.boardObj = pcbnew.GetBoard()
+        # pcbShape = pcbnew.PCB_SHAPE(self.boardObj)
+
+        x0=float(self.PosX_Input.GetValue())*g_multiplier
+        y0=float(self.PosY_Input.GetValue())*g_multiplier
+        # linewidth = 2.54*g_multiplier #TODO 这里添加了一个默认的参数，后面应该用
+        linewidth = int(float(g_multiplier)*self.lineWidth)
+        # alert('edge:%d'%self.theShapeSelection)
+        if(self.theShapeSelection == 0):
+            x1=float(self.length_Input.GetValue())*g_multiplier
+            y1=float(self.width_Input.GetValue())*g_multiplier
+
+
+            #
+            # alert('anything')
+            # alert('edge:%s'%type(self.lineWidth))
+            AddRectShape(x1,y1,linewidth,x0,y0,self.theLayer)
+        elif self.theShapeSelection == 1:
+            x1=float(self.length_Input.GetValue())*g_multiplier
+            y1=float(self.width_Input.GetValue())*g_multiplier
+            ra = float(self.angleRadius_Input.GetValue())*g_multiplier
+            AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer)
+        elif self.theShapeSelection == 2:
+            r_circle=float(self.length_Input.GetValue())*g_multiplier
+            AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer)
+            AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False)#添加一个圆心标记
+            # pass
+        elif self.theShapeSelection == 3:
+
+            pass
+        elif self.theShapeSelection == 4:
+            pass
+        else:
+            event.Skip()
+
+        pcbnew.Refresh()
+        # self.EndModal()
+        # 这样添加有个bug。。。不知道为什么删除之后会仍然显示但是刷新PCB就没有了 #大概是kicad的bug
+    def onSelectShape(self,event):
+        obj = event.GetEventObject()
+        self.theShapeSelection = obj.GetSelection()
+        # alert('select:%d'%self.shapeRbox.GetSelection())
+        self.showShapeSetInterface(self.theShapeSelection)
+        # #分别是0 1 2 3
+        # if(self.theShapeSelection==0):
+        #     # alert('select:%d'%self.shapeRbox.GetSelection())
+        #     pass
+        # elif self.theShapeSelection==1:
+        #     pass
+        # elif self.theShapeSelection==2:
+        #     pass
+        # elif self.theShapeSelection==3:
+        #     pass
+        # else:
+        #     event.Skip()
+    def showShapeSetInterface(self,shapeKind):
+        # alert('select:%d'%self.shapeRbox.GetSelection())
+        if(shapeKind==0):
+            # alert('select:%d'%self.shapeRbox.GetSelection())
+            #show
+            self.Xtext.Show()
+            self.Ytext.Show()
+            self.width_Input.Show()
+            #Hide
+            self.R_angle_text.Hide()
+            self.Rtext.Hide()
+            self.angleRadius_Input.Hide()
+            # 显示矩形长宽，左上角位置的填写框
+        elif shapeKind==1:
+            
+            #show
+            self.Xtext.Show()
+            self.Ytext.Show()
+            self.R_angle_text.Show()
+            self.angleRadius_Input.Show()
+            self.width_Input.Show()
+            # Hide
+            self.Rtext.Hide()
+            # pass
+            # 显示圆角矩形长宽，左上角位置，圆角半径
+        elif shapeKind==2:
+            # 显示圆弧半径，圆心x 圆心 y
+            # 直接和矩形框的填写复用吧，改一下显示的条目就行
+            # self.R_angle_text.Show()
+            self.Rtext.Show()
+            # Hide
+            self.R_angle_text.Hide()
+            self.Xtext.Hide()
+            self.Ytext.Hide()
+            self.width_Input.Hide()
+            self.angleRadius_Input.Hide()
+            # pass
+        elif shapeKind==3:
+            # 显示脚本编辑框
+
+            # Hide
+            self.R_angle_text.Hide()
+            self.Xtext.Hide()
+            self.Ytext.Hide()
+            self.width_Input.Hide()
+            self.angleRadius_Input.Hide()
+            self.Rtext.Show()
+            pass
+        else:
+            pass
+            # event.Skip()
+            
+    def onClickTestBtn(self,event):
+        pcbnew.Refresh()
+    def OnContextMenu( self, event ):
+        self.PopupMenu( self.m_menu1, event.GetPosition() )
+        alert("Testing")
 # 插件入口
 class Add_Shapes(pcbnew.ActionPlugin):
     # global g_multiplier
@@ -237,234 +481,27 @@ class Add_Shapes(pcbnew.ActionPlugin):
         self.name = "添加板框"
         self.category = "形状编辑" #？这写啥
         self.description = "参数化添加常用板框形状或者其他层的形状"
-        self.show_toolbar_button = True # 可选，默认为 False
+        self.show_toolbar_button = True # 可选，默认为 False(在插件bar上显示出来)
         self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') # 可选
     def Run(self):
         # 在用户操作时执行的插件的入口函数
-        # print("Hello World")
         # wx.TextEntryDialog(None,message="Enter Number of Layers to Skip")
         # 窗体启动入口
-        class Dialog(wx.Dialog):
-            def __init__(self, parent):
-                #-----------------------设定窗口信息------------------
-                InitEm()
-                funcName = '外型生成'
-                version='v0.10001'
-                shapeRboxLable = '外型类型'
-                self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
-                # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
-                wx.Dialog.__init__(self, parent, id=-1, title=funcName+version, size=Em(44,14),
-                                   style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-                # wx.Dialog.__init__(
-                #     self, parent, title=f'Fillet board edges',
-                #     style=(wx.DEFAULT_DIALOG_STYLE | wx.DIALOG_NO_PARENT))
-                # self.Bind(wx.EVT_CLOSE, self.OnClose, id=self.GetId())
-                icon=wx.Icon(self.icon_file_name)
-                self.SetIcon(icon)#显示Logo图标
-                self.panel = wx.Panel(self) #添加一个panel容纳元素 
-
-                
-                # --------------根据板子信息自动初始化一些数据--TODO:这里后面写----
-                #边框中心位置（或者左上角）边框默认大小
-                center_posX = 0
-                center_posY = 0
-                X_length = 100
-                Y_length = 100
-                R_value = 5
-                #-------------下面是UI部分---------------------
-                # wx.StaticText(self.panel, wx.ID_ANY, getstr('LABEL'), size=Em(70,1), pos=Em(1,1))
-                # wx.StaticText(self.panel, wx.ID_ANY, getstr('MENUFACTURERS'),size=Em(14,1), pos=Em(1,2.5))
-                # wx.StaticText(self.panel, wx.ID_ANY, getstr('MENUFACTURERS'),size=Em(14,1), pos=Em(1,2.5))
-                #if in chinese,四个选项包含
-                shapeList = ['矩形', '圆角矩形', '圆形','多边形导入'] 
-                shapeList = ['矩形', '圆角矩形', '圆形','脚本生成']#ScriptEdit
-                self.theShapeSelection = 0
-                self.lineWidth = 0.254 # mm 
-                # self.lineWidth = 0.1 #mm
-                self.theLayer = pcbnew.Edge_Cuts
-                self.shapeRbox = wx.RadioBox(self.panel,  wx.ID_ANY, label = shapeRboxLable ,pos=Em(1,1), choices = shapeList,
-                    majorDimension = 1, style = wx.RA_SPECIFY_ROWS) 
-                    
-
-                self.shapeRbox.SetSelection(self.theShapeSelection)#默认选择矩形
-                self.shapeRbox.Bind(wx.EVT_RADIOBOX,self.onSelectShape)#绑定动作到onSeletShape函数
-                #(self, parent, id=ID_ANY, value=EmptyString, pos=DefaultPosition, size=DefaultSize, style=0, validator=DefaultValidator, name=TextCtrlNameStr 
-
-                # ---输入数据单位可选，同时读取板设置自动选择mm mil
-                #X坐标输入框
-                self.PosX_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posX),pos=Em(2+2,5),size=Em(8,1),name='x')
-                #Y坐标输入框
-                self.PosY_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posY),pos=Em(14+2,5),size=Em(8,1),name='y')
-
-                #X长度输入框
-                #圆形的半径直接取上面的X
-                self.length_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(X_length),pos=Em(2+2,7),size=Em(8,1),name='xl')
-                #宽度输入框Y
-                self.width_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(Y_length),pos=Em(14+2,7),size=Em(8,1),name='yl')
-                # 圆角半径生成参数
-                self.angleRadius_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(R_value),pos=Em(2+2,9),size=Em(8,1),name='rvalue')
-                # alert('select:%d'%self.shapeRbox.GetSelection())
-                # ----------文本----------
-                # X坐标和Y坐标文本
-                xytxt = '位置坐标'
-                self.Xytext = wx.StaticText(self.panel, wx.ID_ANY, label=xytxt, pos=Em(2,4))#, size, style)
-                xtxt = "X:"
-                self.Xtext = wx.StaticText(self.panel, wx.ID_ANY, label=xtxt, pos=Em(2,5))#, size, style)
-                ytxt = "Y:"
-                self.Ytext = wx.StaticText(self.panel, wx.ID_ANY, label=ytxt, pos=Em(14,5))#, size, style)
-
-                # 参数文本
-                sizetxt = '尺寸'
-                self.Sizetext = wx.StaticText(self.panel, wx.ID_ANY, label=sizetxt, pos=Em(2,6))#, size, style)
-                xtxt = "XL"
-                self.Xtext = wx.StaticText(self.panel, wx.ID_ANY, label=xtxt, pos=Em(2,7))#, size, style)
-                Rtxt = "R:"
-                self.Rtext = wx.StaticText(self.panel, wx.ID_ANY, label=Rtxt, pos=Em(2,7))#, size, style)
-                ytxt = "YL"
-                self.Ytext = wx.StaticText(self.panel, wx.ID_ANY, label=ytxt, pos=Em(14,7))#, size, style)
-                    # 圆角矩形的圆角大小
-                # sizetxt = '半径'
-                # self.Sizetext = wx.StaticText(self.panel, wx.ID_ANY, label=sizetxt, pos=Em(2,6))#, size, style)
-                r_angle_txt = "R:"
-                self.R_angle_text = wx.StaticText(self.panel, wx.ID_ANY, label=r_angle_txt, pos=Em(2,9))#, size, style)
-                
-                #-------需要默认隐藏的项目
-                self.Rtext.Hide()
-                self.R_angle_text.Hide()
-                self.angleRadius_Input.Hide()
-
-                # ---------按钮----------
-                confirmText = '应用'
-                self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=confirmText,pos=Em(16,10))#,size=DefaultSize)
-                self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickConfirmBtn)
-
-                testText = '刷新显示'
-                self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(28,10))#,size=DefaultSize)
-                self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
-
-                # testText = 'ScriptEdit'
-                # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
-                # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
-
-                # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
-                # 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
-            
-            
-            
-            def showShapeSetInterface(self,shapeKind):
-                # alert('select:%d'%self.shapeRbox.GetSelection())
-                if(shapeKind==0):
-                    # alert('select:%d'%self.shapeRbox.GetSelection())
-                    #show
-                    self.Xtext.Show()
-                    self.Ytext.Show()
-                    self.width_Input.Show()
-                    #Hide
-                    self.R_angle_text.Hide()
-                    self.Rtext.Hide()
-                    self.angleRadius_Input.Hide()
-                    # 显示矩形长宽，左上角位置的填写框
-                elif shapeKind==1:
-                    
-                    #show
-                    self.Xtext.Show()
-                    self.Ytext.Show()
-                    self.R_angle_text.Show()
-                    self.angleRadius_Input.Show()
-                    self.width_Input.Show()
-                    # Hide
-                    self.Rtext.Hide()
-                    # pass
-                    # 显示圆角矩形长宽，左上角位置，圆角半径
-                elif shapeKind==2:
-                    # 显示圆弧半径，圆心x 圆心 y
-                    # 直接和矩形框的填写复用吧，改一下显示的条目就行
-                    # self.R_angle_text.Show()
-                    self.Rtext.Show()
-                    # Hide
-                    self.R_angle_text.Hide()
-                    self.Xtext.Hide()
-                    self.Ytext.Hide()
-                    self.width_Input.Hide()
-                    self.angleRadius_Input.Hide()
-                    # pass
-                elif shapeKind==3:
-                    # 显示脚本编辑框
-
-                    # Hide
-                    self.R_angle_text.Hide()
-                    self.Xtext.Hide()
-                    self.Ytext.Hide()
-                    self.width_Input.Hide()
-                    self.angleRadius_Input.Hide()
-                    self.Rtext.Show()
-                    pass
-                else:
-                    pass
-                    # event.Skip()
-            def onSelectShape(self,event):
-                obj = event.GetEventObject()
-                self.theShapeSelection = obj.GetSelection()
-                # alert('select:%d'%self.shapeRbox.GetSelection())
-                self.showShapeSetInterface(self.theShapeSelection)
-                #分别是0 1 2 3
-                if(self.theShapeSelection==0):
-                    # alert('select:%d'%self.shapeRbox.GetSelection())
-                    pass
-                elif self.theShapeSelection==1:
-                    pass
-                elif self.theShapeSelection==2:
-                    pass
-                elif self.theShapeSelection==3:
-                    pass
-                else:
-                    event.Skip()
-            def onClickConfirmBtn(self,event):
-                #应用板框画到板子上
-                # (gr_rect (start 215.9 60.96) (end 228.6 71.12) (layer "Edge.Cuts") (width 0.2) (fill none) (tstamp 1799c71f-013d-402a-b710-c5585561a246))
-                # (gr_line (start 196.85 53.34) (end 229.87 53.34) (layer "Edge.Cuts") (width 0.2) (tstamp cf625e85-a2c0-4557-8b5f-dc6b2e43c20d))
-                self.boardObj = pcbnew.GetBoard()
-                # pcbShape = pcbnew.PCB_SHAPE(self.boardObj)
-
-                x0=float(self.PosX_Input.GetValue())*g_multiplier
-                y0=float(self.PosY_Input.GetValue())*g_multiplier
-                # linewidth = 2.54*g_multiplier #TODO 这里添加了一个默认的参数，后面应该用
-                linewidth = int(float(g_multiplier)*self.lineWidth)
-                # alert('edge:%d'%self.theShapeSelection)
-                if(self.theShapeSelection == 0):
-                    x1=float(self.length_Input.GetValue())*g_multiplier
-                    y1=float(self.width_Input.GetValue())*g_multiplier
-
-    
-                    #
-                    # alert('anything')
-                    # alert('edge:%s'%type(self.lineWidth))
-                    AddRectShape(x1,y1,linewidth,x0,y0,self.theLayer)
-                elif self.theShapeSelection == 1:
-                    x1=float(self.length_Input.GetValue())*g_multiplier
-                    y1=float(self.width_Input.GetValue())*g_multiplier
-                    ra = float(self.angleRadius_Input.GetValue())*g_multiplier
-                    AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer)
-                elif self.theShapeSelection == 2:
-                    r_circle=float(self.length_Input.GetValue())*g_multiplier
-                    AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer)
-                    AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False)#添加一个圆心标记
-                    # pass
-                elif self.theShapeSelection == 3:
-
-                    pass
-                elif self.theShapeSelection == 4:
-                    pass
-                else:
-                    event.Skip()
-
-                pcbnew.Refresh()
-                # self.EndModal()
-                # 这样添加有个bug。。。不知道为什么删除之后会仍然显示但是刷新PCB就没有了 #大概是kicad的bug
-            def onClickTestBtn(self,event):
-                pcbnew.Refresh()
-
-        dialog = Dialog(None)
-        dialog.Center()
-        dialog.ShowModal()
-        dialog.Destroy()
+        pcbnew.Refresh()                        #Anyway,fresh the pcb first.
+        try:
+            mydialog = Dialog(None)
+            mydialog.Center()
+            mydialog.Show()
+        except:
+            # mydialog.Destroy()
+            print("dead")
+        # finally:
+        #     pass
+        # dialog.ShowModal()#使用模式显示会导致kicad回显已经删除的边框的bug
+        # dialog.Destroy()
+        # with Dialog(None) as myDialog:
+        #     if myDialog.ShowModal() == wx.ID_OK:
+        #     # do something here
+        #         print('good')
+        #     else:
+        #         print('deaad')
