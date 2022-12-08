@@ -1,5 +1,7 @@
 import wx
 import shape_para_set
+import sys
+import pcbnew
 # import pcbnew
 #这个tester.py是个启动器，用来调界面的，使用kicad的环境就行。
 # 免得每次都要在kicad里面刷新插件（我也不知道怎么用kicad启动调试）
@@ -42,11 +44,24 @@ class MyFrame(wx.Frame):
         # dialog.Center()
         # dialog.ShowModal()
         pass
-
-app = wx.App()
-# frame = MyFrame()
-dialog = shape_para_set.Add_Shapes()
-dialog.Run()
+if __name__ == "__main__":
+    app = wx.App()
+    # frame = MyFrame()
+    # testdlg = shape_para_set.MyDialog(None)
+    # testdlg.ShowModal()
+    # testdlg.Destroy()
+    # app.MainLoop()
+    isDebug = True if sys.gettrace() else False
+    if isDebug:
+        global boardobj
+        pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        boardobj=pcbnew.LoadBoard(pcbfile)
+        dialog=shape_para_set.Dialog(None)
+        dialog.Show()
+    else:
+        dialog = shape_para_set.Add_Shapes()
+        dialog.Run()
+    app.MainLoop()
 
 
 # frame.Show()

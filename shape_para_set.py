@@ -3,27 +3,35 @@ import pcbnew
 import os
 import wx
 from pcbnew import *
-
+# Import the gettext module,用于执行不同翻译
+# import gettext 
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
 
 #TODO-list：
-#1：根据屏幕像素自适应像素大小 TODO:或者是调整布局适应方式
-# TODO:增加退出的时候自动保存配置，打开的时候自动加载上一次配置（增加在设置里面选择是否记忆）
-# TODO: 输入数字框换成wxspinctrldouble（不一定做）
+# TOD :让添加的层可选（已经完成
+#--combobox如果加载panel之上就会阻塞panel加载。
+# 增加了一个layerDict用来存储当前板子的层的名称和序号，其实用不用无所谓，放着吧
+# 不过这个刷新板子并获取数据的位置不太好，不应该放在ui初始化中间，后面再修改
+#1：根据屏幕像素自适应像素大小，目前是根据M这个字母的大小小郑 TODO:或者是调整布局适应方式
+
 # TODO：添加之后的边框添加尺寸标注
 # TODO: 位置坐标分到一组，大小分为一组，位置坐标增加可选中心还是左上角为坐标点。
-# giveupTODO:1 单位可选择 （默认跟随全局还是mm？）放弃原因：做边框用个毛线英制
 # TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
 # 考虑到还要做自动获取上次参数或者用于别的用途（比如开槽），所以这里应该做一个按键来确认后
 # 自动获取板子的合适大小。
-# TODO :让添加的层可选
 # TODO: 增加选项，添加边框的时候删除原来的边框
-# TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面
-# TODO:添加正多边形的添加
-# TODO： 添加预览界面
 # TODO：添加高级选项功能
+# TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面# 生成线宽可选
 # TODO :添加功能配置记录，用来存放配置和用来每次打开的时候读取上一次保存的记录
-# TODO:生成线宽可选
+# TODO:增加退出的时候自动保存配置，打开的时候自动加载上一次配置（增加在设置里面选择是否记忆）
+# TODO: 添加正多边形的添加
+# TODO： 添加预览界面
+# TODO: 输入数字框换成wxspinctrldouble（不一定做）
+# giveupTODO:1 单位可选择 （默认跟随全局还是mm？）放弃原因：做边框用个毛线英制
+# 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
+# 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
+
+
 #3 等后面复选框没有bug了在看看文档层能不能吸附圆心 更新：这里确认了圆心基本不能自动吸附在不对其网格的点上，功能本来就是为了摆放安装孔方便，所以这个功能暂时不做了
 # 0 语言忘差不多了，写法得看看了
 #2 todo:添加脚本功能类似openscad编辑边框形状
@@ -34,19 +42,24 @@ from pcbnew import *
 # 1、更新默认线宽为0.1mm，因为kicad的默认是这么多，以免看着不舒服。
 # 2、又该回去了默认线宽，因为jlc开槽精度到不了那么大，太细的线会有错觉（
 # 3、分离了部分ui代码，剩下慢慢搞吧。
-# 4、准备添加一个右键菜单，但是没搞出来。
+# 4、准备添加一个右键菜单，已经做了但是没加功能
+# 5、添加打开插件就先刷新pcb的代码，避免有文件修改
+# 6、更新TODO项目，完成添加层可选的功能
 # Fixed：
-# 1#TODO:不知道为什么这样会算不出来宽度，也没报错就运行不了  --- 输入线宽需要是整数，已经修复，后续可以添加调整线宽的功能
+# 1#原始问题：不知道为什么这样会算不出来宽度，也没报错就运行不了
+# 解决：--- 输入线宽需要是整数，已经修复，后续可以添加调整线宽的功能
 # 2修复了删除被添加的边框后被回显出来的bug（改dialog的显示方法为show而不是showModal，摸不着头脑
 # 但是保留刷新按键，方便一些别的改文件操作
-# 3 添加打开插件就先刷新pcb的代码，避免有文件修改
+# 3 
 # 
 UNITS = ["mm", "in"]
 g_multiplier = 1000000#KiCad中数字的单位是10^-6 mm 所以要乘回去
 
 #
 def alert(s, icon=0):
+    print(s)
     wx.MessageBox(s, '阿巴阿巴title', wx.OK|icon)
+    
 
 
 
@@ -243,11 +256,12 @@ class Dialog(wx.Dialog):
             chsize=(tx[0]*1.1,tx[1]*1.5)
         def Em(x,y,dx=0,dy=0):
             return (chsize[0]*x+dx, chsize[1]*y+dy)
+
         #-----------------------设定窗口信息------------------
         InitEm()
-        funcName = '外型生成'#illet board edges
-        version='v0.10001'
-        shapeRboxLable = '外型类型'
+        funcName = '外形生成'#illet board edges
+        version='v0.10103'
+        shapeRboxLable = '外形类型'
         self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
         # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
         wx.Dialog.__init__(self, parent, id=-1, 
@@ -262,17 +276,11 @@ class Dialog(wx.Dialog):
         # self.Bind(wx.EVT_CLOSE, self.OnClose, id=self.GetId())
         icon=wx.Icon(self.icon_file_name)
         self.SetIcon(icon)#显示Logo图标
+        # self.BoxSizer = wx.BoxSizer(self)#TODO:设计器里面的流程是先加一个sizer？回头看看文档
+        bSizer_1 = wx.BoxSizer( wx.VERTICAL )
         self.panel = wx.Panel(self) #添加一个panel容纳元素 
+        # self.panel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
 
-        self.m_menu1 = wx.Menu()
-        self.m_menuItem1 = wx.MenuItem( self.m_menu1, wx.ID_ANY, u"MyMenuItem", wx.EmptyString, wx.ITEM_NORMAL )
-        self.m_menu1.Append( self.m_menuItem1 )
-
-        self.m_menu1.AppendSeparator()
-
-        self.m_menuItem2 = wx.MenuItem( self.m_menu1, wx.ID_ANY, u"MyMenuItem", wx.EmptyString, wx.ITEM_NORMAL )
-        self.m_menu1.Append( self.m_menuItem2 )
-        self.Bind( wx.EVT_RIGHT_DOWN, self.OnContextMenu )
         # --------------根据板子信息自动初始化一些数据--TODO:这里后面写----
         #边框中心位置（或者左上角）边框默认大小
         center_posX = 0
@@ -291,6 +299,7 @@ class Dialog(wx.Dialog):
         self.lineWidth = 0.254 # mm 
         # self.lineWidth = 0.1 #mm
         self.theLayer = pcbnew.Edge_Cuts
+        #TODO 这里是几个默认参数，确认不需要的话可以删掉
         self.shapeRbox = wx.RadioBox(self.panel,  wx.ID_ANY, label = shapeRboxLable ,pos=Em(1,1), choices = shapeList,
             majorDimension = 1, style = wx.RA_SPECIFY_ROWS) 
                 # self.panel.o
@@ -355,20 +364,117 @@ class Dialog(wx.Dialog):
         # testText = 'ScriptEdit'
         # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
         # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
+        self.layerCombBoxChoices = []
+        
+        # print(pcbnew.PCB_LAYER_ID_COUNT)
+        
+        # for i in range(pcbnew.PCB_LAYER_ID_COUNT):
+        #     # print(pcbnew.LayerName(i))#获取所有的层的名称
+        #     layer_colors = {}
 
-        # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
-        # 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
+        # for layer_id in range(pcbnew.LAYER_ID_COUNT):
+        #     layer = board.GetLayer(layer_id)
+        #     color = layer.GetColor()
+        #     layer_colors[layer.GetName()] = color
+
+        # for i in range(pcbnew.PCB_LAYER_ID_COUNT):
+        #     print(pcbnew.current (i))
+        # for layer in pcbnew.GetBoard().getLay
+                # self._layer_choices = layer_choices = ["F.Cu", "F.Paste", "F.SilkS", "F.Mask", "F.Cu/F.Mask"]
+        # self.m_LayerComboBox.AppendItems(layer_choices)
+        # self.m_LayerComboBox.SetSelection(0)
+        # ComboBox(parent, id=ID_ANY, value=EmptyString, pos=DefaultPosition, size=DefaultSize, choices=[], style=0, validator=DefaultValidator, name=ComboBoxNameStr)
+        self.layerCombBox = wx.ComboBox( self.panel, wx.ID_ANY, 
+                                u"",
+                                pos=Em(14+14,5), 
+                                size=Em(14,1), 
+                                # choices=self.layerCombBoxChoices, 
+                                style=0 )
+        bSizer_1.Add( self.layerCombBox, 0, wx.ALL, 5 )
+        #不需要为layercombobox绑定什么，点确定的时候获取就行了。
+        # self.layerCombBox.Bind(wx.EVT_COMBOBOX)
+        # self.layerCombBox.Dismiss()
+        # self.layerCombBox = wx.ComboBox(self, choices=["Option 1", "Option 2", "Option 3"])
+        # # Add the combobox to the dialog
+        # self.sizer = wx.BoxSizer(wx.VERTICAL)
+        # self.sizer.Add(self.layerCombBox, 0, wx.ALL, 5)
+        # self.SetSizer(self.sizer)
+
+        
+        # Create the menu创建右键菜单
+
+        self.rightMenu = wx.Menu()
+        self.rightMenuItem0 = wx.MenuItem( 
+                            self.rightMenu, 
+                            wx.ID_ANY, 
+                            u"打开设置",
+                            wx.EmptyString, wx.ITEM_NORMAL )
+        self.rightMenu.Append( self.rightMenuItem0 )
+        #添加一个分割，和上面的设置分开
+        self.rightMenu.AppendSeparator()
+        self.rightMenu.Append(wx.ID_ANY, "TODO")
+        self.rightMenu.Append(wx.ID_ANY, "TODO2")
+        #添加一个分割 后面是checkitem
+        self.rightMenu.AppendSeparator()
+        self.rightMenu.AppendCheckItem(wx.ID_ANY, "TODO3")
+        #添加一个分割 后面是radioitem
+        self.rightMenu.AppendSeparator()
+        self.rightMenu.AppendRadioItem(wx.ID_ANY, "TODO2")
+        self.rightMenu.AppendRadioItem(wx.ID_ANY, "TODO2")
+        #添加一个分割 后面是submenu
+        self.rightMenu.AppendSeparator()
+        self.submenu = wx.Menu()
+        self.rightMenu.AppendSubMenu(self.submenu, "TODO2")
+        # Append(id, item=EmptyString, helpString=EmptyString, kind=ITEM_NORMAL)
+        # AppendCheckItem(self, id, item, help=EmptyString):
+        # AppendRadioItem(self, id, item, help=EmptyString):
+        # AppendSubMenu(self, submenu, text, help=EmptyString):
+
+        #把绑定右键事件到panel上
+        self.panel.Bind(wx.EVT_RIGHT_DOWN, self.OnRightDown)
+        # Bind the menu items to actions绑定菜单里的选项
+        self.Bind(wx.EVT_MENU, self.OpenSetting, id=self.rightMenuItem0.GetId())
+
+#--------------------根据板参数刷新ui上的选项--------------------
+        #TODO:初始化界面里面不应该加载pcb，先凑合用，后面再改出去界面初始化加载和pcb加载分开
+        boardobj = pcbnew.GetBoard()
+        #------调试加载板子用------------TODO:debug here
+        # pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        # boardobj=pcbnew.LoadBoard(pcbfile)
+        
+        enabledLayerSet = boardobj.GetEnabledLayers()
+        enabledLayers = enabledLayerSet.Seq()#使用seq方法获取layerset的对应的id的list
+        self.layerIDlist = []#用来同时存放读出来的id
+        #除了最后10个，也就是用户定义层，当前pcb有的层全部加入combobox TODO:是否所有工程都有最后10层用户层和resue？不过问题不大，先不管
+        for theLayerID in enabledLayers[:-10]:
+            # print(pcbnew.LayerName(theLayerID))
+            self.layerCombBoxChoices.append(pcbnew.LayerName(theLayerID))#把名称加到choice里面
+            self.layerIDlist.append(theLayerID)
+
+        self.layerDict=dict(zip(self.layerIDlist,self.layerCombBoxChoices))#打包成字典方便后面用
+
+        #因为主要是画边框，所以首先定位到边框选项
+        self.layerCombBox.AppendItems(self.layerCombBoxChoices)
+        self.layerCombBox.SetSelection(self.layerCombBoxChoices.index('Edge.Cuts'))
+        # TODO :这里添加选项之后没有和kicad里面一样的颜色指示，
+        # 怎么获取添加颜色？chatgpt也不能给出方案，在kicad文档里面也没找到合适的color相关内容
+        # TODO :最好是默认去掉一般用不上的层，太长一串看着烦。。比如说最后10层都是用户定义层（反正加了之后自己可以改）
+    
+    #点确认之后应用板框，添加到板子上
     def onClickConfirmBtn(self,event):
-        #应用板框画到板子上
+        
         # (gr_rect (start 215.9 60.96) (end 228.6 71.12) (layer "Edge.Cuts") (width 0.2) (fill none) (tstamp 1799c71f-013d-402a-b710-c5585561a246))
         # (gr_line (start 196.85 53.34) (end 229.87 53.34) (layer "Edge.Cuts") (width 0.2) (tstamp cf625e85-a2c0-4557-8b5f-dc6b2e43c20d))
         self.boardObj = pcbnew.GetBoard()
+        print(self.layerCombBox.GetStringSelection())
+        # self.theLayer = 1
+        layerindex=self.layerCombBoxChoices.index(self.layerCombBox.GetStringSelection())
+        self.theLayer = self.layerIDlist[layerindex]
+        # pcbnew.LayerName(self.leau)
         # pcbShape = pcbnew.PCB_SHAPE(self.boardObj)
-
         x0=float(self.PosX_Input.GetValue())*g_multiplier
         y0=float(self.PosY_Input.GetValue())*g_multiplier
-        # linewidth = 2.54*g_multiplier #TODO 这里添加了一个默认的参数，后面应该用
-        linewidth = int(float(g_multiplier)*self.lineWidth)
+        linewidth = int(float(g_multiplier)*self.lineWidth)#linewidth只接受整数
         # alert('edge:%d'%self.theShapeSelection)
         if(self.theShapeSelection == 0):
             x1=float(self.length_Input.GetValue())*g_multiplier
@@ -396,10 +502,9 @@ class Dialog(wx.Dialog):
             pass
         else:
             event.Skip()
-
         pcbnew.Refresh()
         # self.EndModal()
-        # 这样添加有个bug。。。不知道为什么删除之后会仍然显示但是刷新PCB就没有了 #大概是kicad的bug
+    # onSelectShape：点击不同外形设置的时候切换界面
     def onSelectShape(self,event):
         obj = event.GetEventObject()
         self.theShapeSelection = obj.GetSelection()
@@ -408,15 +513,9 @@ class Dialog(wx.Dialog):
         # #分别是0 1 2 3
         # if(self.theShapeSelection==0):
         #     # alert('select:%d'%self.shapeRbox.GetSelection())
-        #     pass
-        # elif self.theShapeSelection==1:
-        #     pass
-        # elif self.theShapeSelection==2:
-        #     pass
-        # elif self.theShapeSelection==3:
-        #     pass
         # else:
         #     event.Skip()
+    # showShapeSetInterface：根据不同的选择外形类型，显示不同的界面来输入参数
     def showShapeSetInterface(self,shapeKind):
         # alert('select:%d'%self.shapeRbox.GetSelection())
         if(shapeKind==0):
@@ -468,12 +567,27 @@ class Dialog(wx.Dialog):
         else:
             pass
             # event.Skip()
-            
+    #   onClickTestBtn：现在叫做刷新显示按键
     def onClickTestBtn(self,event):
         pcbnew.Refresh()
-    def OnContextMenu( self, event ):
-        self.PopupMenu( self.m_menu1, event.GetPosition() )
-        alert("Testing")
+    # OnRightDown：绑定右键菜单
+    def OnRightDown( self, event ):
+        self.PopupMenu( self.rightMenu, event.GetPosition())
+    #     self.PopupMenu(self.menu)
+        # alert(self.rightMenuItem0.GetId())
+    def OpenSetting(self, event):
+        event.Skip()
+        # alert("Testing")
+        dlg = wx.Dialog(None, title="TestDialog")
+        dlg.ShowModal()
+        # alert("Testingstp2")
+        dlg.Destroy()
+    def onLayerChoseChanged(self, event):
+        pass
+    #TODO:保留给其他的右键菜单按钮或者神
+    def todo(self, event):
+        pass
+
 # 插件入口
 class Add_Shapes(pcbnew.ActionPlugin):
     # global g_multiplier
