@@ -6,13 +6,16 @@ from pcbnew import *
 
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
 
-#TODO list：
-
-
-#1：根据屏幕像素自适应像素大小 TODO:调整布局方式
+#TODO-list：
+#1：根据屏幕像素自适应像素大小 TODO:或者是调整布局适应方式
+# TODO:增加退出的时候自动保存配置，打开的时候自动加载上一次配置（增加在设置里面选择是否记忆）
+# TODO: 输入数字框换成wxspinctrldouble（不一定做）
 # TODO：添加之后的边框添加尺寸标注
-# TODO:1 单位可选择 
+# TODO: 位置坐标分到一组，大小分为一组，位置坐标增加可选中心还是左上角为坐标点。
+# giveupTODO:1 单位可选择 （默认跟随全局还是mm？）放弃原因：做边框用个毛线英制
 # TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
+# 考虑到还要做自动获取上次参数或者用于别的用途（比如开槽），所以这里应该做一个按键来确认后
+# 自动获取板子的合适大小。
 # TODO :让添加的层可选
 # TODO: 增加选项，添加边框的时候删除原来的边框
 # TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面
@@ -20,27 +23,43 @@ from pcbnew import *
 # TODO： 添加预览界面
 # TODO：添加高级选项功能
 # TODO :添加功能配置记录，用来存放配置和用来每次打开的时候读取上一次保存的记录
+# TODO:生成线宽可选
 #3 等后面复选框没有bug了在看看文档层能不能吸附圆心 更新：这里确认了圆心基本不能自动吸附在不对其网格的点上，功能本来就是为了摆放安装孔方便，所以这个功能暂时不做了
 # 0 语言忘差不多了，写法得看看了
 #2 todo:添加脚本功能类似openscad编辑边框形状
 # 分段的边框添加到一个组里面避免移动困难（可选）
 # 圆心标记功能添加到高级里面可以取消
-
-## 
+#更新表单：
+# 2022 12 之前的就不说了
+# 1、更新默认线宽为0.1mm，因为kicad的默认是这么多，以免看着不舒服。
+# 2、又该回去了默认线宽，因为jlc开槽精度到不了那么大，太细的线会有错觉（
+# Fixed：
+# #TODO:不知道为什么这样会算不出来宽度，也没报错就运行不了  ---输入线宽需要是整数
 UNITS = ["mm", "in"]
-multiplier = 1000000#KiCad中数字的单位是10^-6 mm
+g_multiplier = 1000000#KiCad中数字的单位是10^-6 mm 所以要乘回去
 #
 def alert(s, icon=0):
-    wx.MessageBox(s, 'xxxtitle', wx.OK|icon)
+    wx.MessageBox(s, '阿巴阿巴title', wx.OK|icon)
 
+# 用来调整布局的
+#InitEm 函数首先定义了一个全局变量 chsize，
+# 并将其初始化为 (10,20)。
+# 然后它创建一个 wx.ScreenDC 对象，
+# 这个对象可以用来在屏幕上绘图。
+# 接着，它创建一个字体对象，
+# 并将这个字体设置到 wx.ScreenDC 对象上
 chsize = (10,20)#这个最好改掉
 def InitEm():
     global chsize
     dc=wx.ScreenDC()
     font=wx.Font(pointSize=10,family=wx.DEFAULT,style=wx.NORMAL,weight=wx.NORMAL)
     dc.SetFont(font)
+    # 获取 "M" 这个字符的宽和高
     tx=dc.GetTextExtent("M")
-    chsize=(tx[0],tx[1]*1.5)
+    # 将 chsize 全局变量的值
+    #设置为字符宽度和高度的 1.5 倍。
+    chsize=(tx[0]*1.2,tx[1]*1.5)
+
 
 def Em(x,y,dx=0,dy=0):
     return (chsize[0]*x+dx, chsize[1]*y+dy)
@@ -74,12 +93,14 @@ def AddRectShape(shape_length,shape_width,segmentWidth,x0,y0,chosenLayer):
     boardObj.Add(shape_segments)
 
 #添加圆角矩形 
-# #TODO:需要用丝印或者什么元素标记圆角中心点方便手动添加安装孔TODO:这里多段添加的写法是不是有点问题
+# TODO:需要用丝印或者什么元素标记圆角中心点方便手动添加安装孔（暂时搁置，加了，效果不好）
+# TODO:这里多段添加，添加到一个组里面方便整体挪动（有没有必要？）
 def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chosenLayer):
     boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
 
-    # 左上角的圆角 TODO:不知道为啥这里改了PCBshape的变量名就会有问题，以后再说  
+    # 左上角的圆角 
+    # TODO:不知道为啥这里改了PCBshape的变量名就会有问题，以后再说  
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments.SetShape(pcbnew.SHAPE_T_ARC)#设置为圆弧
     # 第一个圆角，坐标是（x0-r,y0-r),起始点是（x0-r,y0)
@@ -184,7 +205,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
     # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
     # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
-#添加圆形
+#添加圆形shape
+# TODO：圆形的参数应该用直径还是半径？
 def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLocked=False):
     boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
@@ -196,35 +218,38 @@ def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLoc
     # shape_segments.SetEnd(wxPoint(x0+shape_length,y0+shape_width))
     shape_segments.SetEnd(wxPoint(x0+shape_radius,y0))
 
-    shape_segments.SetWidth(segmentWidth)#250000
+    shape_segments.SetWidth(segmentWidth)#
     shape_segments.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
     shape_segments.SetFilled(isFill)
     shape_segments.SetLocked(isLocked)
     
-    # TODO :然后添加一个圆心
-    # if hasattr(shape_segments,'SetTimeStamp'):   #不要也没事
+    # TODO :然后添加一个圆心，暂时搁置
+    # if hasattr(shape_segments,'SetTimeStamp'):   #不要这段也没事
     #     shape_segments.SetTimeStamp(ts)
     boardObj.Add(shape_segments)
+# 这个还没做TODO,添加用openscad描述的自定义形状（不实用）
 def AddScadShape(segmentWidth,chosenLayer):
     pass
+# 插件入口
 class Add_Shapes(pcbnew.ActionPlugin):
+    # global g_multiplier
     def defaults(self):
         self.name = "添加板框"
         self.category = "形状编辑" #？这写啥
         self.description = "参数化添加常用板框形状或者其他层的形状"
         self.show_toolbar_button = True # 可选，默认为 False
         self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') # 可选
-
     def Run(self):
         # 在用户操作时执行的插件的入口函数
         # print("Hello World")
         # wx.TextEntryDialog(None,message="Enter Number of Layers to Skip")
+        # 窗体启动入口
         class Dialog(wx.Dialog):
             def __init__(self, parent):
                 #-----------------------设定窗口信息------------------
                 InitEm()
-                funcName = '外型设置'
-                version='v0.1'
+                funcName = '外型生成'
+                version='v0.10001'
                 shapeRboxLable = '外型类型'
                 self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
                 # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
@@ -237,7 +262,6 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 icon=wx.Icon(self.icon_file_name)
                 self.SetIcon(icon)#显示Logo图标
                 self.panel = wx.Panel(self) #添加一个panel容纳元素 
-                # TODO:似乎dialog并不需要添加panel？
 
                 
                 # --------------根据板子信息自动初始化一些数据--TODO:这里后面写----
@@ -255,7 +279,8 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 shapeList = ['矩形', '圆角矩形', '圆形','多边形导入'] 
                 shapeList = ['矩形', '圆角矩形', '圆形','脚本生成']#ScriptEdit
                 self.theShapeSelection = 0
-                self.lineWidth = 0.254 # mm
+                self.lineWidth = 0.254 # mm 
+                # self.lineWidth = 0.1 #mm
                 self.theLayer = pcbnew.Edge_Cuts
                 self.shapeRbox = wx.RadioBox(self.panel,  wx.ID_ANY, label = shapeRboxLable ,pos=Em(1,1), choices = shapeList,
                     majorDimension = 1, style = wx.RA_SPECIFY_ROWS) 
@@ -321,7 +346,11 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
                 # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
 
-                # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
+                # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
+                # 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
+            
+            
+            
             def showShapeSetInterface(self,shapeKind):
                 # alert('select:%d'%self.shapeRbox.GetSelection())
                 if(shapeKind==0):
@@ -397,24 +426,27 @@ class Add_Shapes(pcbnew.ActionPlugin):
                 self.boardObj = pcbnew.GetBoard()
                 # pcbShape = pcbnew.PCB_SHAPE(self.boardObj)
 
-                x0=float(self.PosX_Input.GetValue())*multiplier
-                y0=float(self.PosY_Input.GetValue())*multiplier
-                linewidth = 250000
+                x0=float(self.PosX_Input.GetValue())*g_multiplier
+                y0=float(self.PosY_Input.GetValue())*g_multiplier
+                # linewidth = 2.54*g_multiplier #TODO 这里添加了一个默认的参数，后面应该用
+                linewidth = int(float(g_multiplier)*self.lineWidth)
                 # alert('edge:%d'%self.theShapeSelection)
                 if(self.theShapeSelection == 0):
-                    x1=float(self.length_Input.GetValue())*multiplier
-                    y1=float(self.width_Input.GetValue())*multiplier
-                    # linewidth = float(multiplier)*self.lineWidth#TODO:不知道为什么这样会算不出来宽度，也没报错就运行不了      
+                    x1=float(self.length_Input.GetValue())*g_multiplier
+                    y1=float(self.width_Input.GetValue())*g_multiplier
+
+    
+                    #
                     # alert('anything')
                     # alert('edge:%s'%type(self.lineWidth))
                     AddRectShape(x1,y1,linewidth,x0,y0,self.theLayer)
                 elif self.theShapeSelection == 1:
-                    x1=float(self.length_Input.GetValue())*multiplier
-                    y1=float(self.width_Input.GetValue())*multiplier
-                    ra = float(self.angleRadius_Input.GetValue())*multiplier
+                    x1=float(self.length_Input.GetValue())*g_multiplier
+                    y1=float(self.width_Input.GetValue())*g_multiplier
+                    ra = float(self.angleRadius_Input.GetValue())*g_multiplier
                     AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer)
                 elif self.theShapeSelection == 2:
-                    r_circle=float(self.length_Input.GetValue())*multiplier
+                    r_circle=float(self.length_Input.GetValue())*g_multiplier
                     AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer)
                     AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False)#添加一个圆心标记
                     # pass
