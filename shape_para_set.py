@@ -259,8 +259,8 @@ class Dialog(wx.Dialog):
 
         #-----------------------设定窗口信息------------------
         InitEm()
-        funcName = '外形生成'#illet board edges
-        version='v0.10103'
+        funcName =      '外形生成'#illet board edges
+        version  =      'v0.10103'
         shapeRboxLable = '外形类型'
         self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
         # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
@@ -357,7 +357,7 @@ class Dialog(wx.Dialog):
         self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=confirmText,pos=Em(16,10))#,size=DefaultSize)
         self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickConfirmBtn)
 
-        testText = '刷新显示'
+        testText = '刷新PCB'
         self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(28,10))#,size=DefaultSize)
         self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
 
@@ -412,7 +412,7 @@ class Dialog(wx.Dialog):
         self.rightMenu.Append( self.rightMenuItem0 )
         #添加一个分割，和上面的设置分开
         self.rightMenu.AppendSeparator()
-        self.rightMenu.Append(wx.ID_ANY, "TODO")
+        self.rightMenu.Append(wx.ID_REFRESH, "刷新PCB")# 右键刷新pcb
         self.rightMenu.Append(wx.ID_ANY, "TODO2")
         #添加一个分割 后面是checkitem
         self.rightMenu.AppendSeparator()
@@ -434,6 +434,7 @@ class Dialog(wx.Dialog):
         self.panel.Bind(wx.EVT_RIGHT_DOWN, self.OnRightDown)
         # Bind the menu items to actions绑定菜单里的选项
         self.Bind(wx.EVT_MENU, self.OpenSetting, id=self.rightMenuItem0.GetId())
+        self.Bind(wx.EVT_MENU, self.onClickTestBtn, id=wx.ID_REFRESH)#绑定到刷新PCB上
 
 #--------------------根据板参数刷新ui上的选项--------------------
         #TODO:初始化界面里面不应该加载pcb，先凑合用，后面再改出去界面初始化加载和pcb加载分开
@@ -569,6 +570,7 @@ class Dialog(wx.Dialog):
             # event.Skip()
     #   onClickTestBtn：现在叫做刷新显示按键
     def onClickTestBtn(self,event):
+        # alert("刷新")
         pcbnew.Refresh()
     # OnRightDown：绑定右键菜单
     def OnRightDown( self, event ):
