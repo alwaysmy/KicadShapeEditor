@@ -283,7 +283,7 @@ class Dialog(wx.Dialog):
         #-----------------------设定窗口信息------------------
         InitEm()
         funcName =      '外形生成'#illet board edges
-        version  =      'v0.10103'
+        version  =      'v0.10109'
         shapeRboxLable = '外形类型'
         self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
         # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
