@@ -3,6 +3,7 @@ import pcbnew
 import os
 import wx
 from pcbnew import *
+import sys
 # Import the gettext module,用于执行不同翻译
 # import gettext 
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
@@ -16,9 +17,6 @@ from pcbnew import *
 
 # TODO：添加之后的边框添加尺寸标注
 # TODO: 位置坐标分到一组，大小分为一组，位置坐标增加可选中心还是左上角为坐标点。
-# TODO:自动选择一组合适的大小和位置用来初始化板子参数（模仿jlc，但是他那个做的不好）
-# 考虑到还要做自动获取上次参数或者用于别的用途（比如开槽），所以这里应该做一个按键来确认后
-# 自动获取板子的合适大小。
 # TODO: 增加选项，添加边框的时候删除原来的边框
 # TODO：添加高级选项功能
 # TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面# 生成线宽可选
@@ -30,14 +28,30 @@ from pcbnew import *
 # giveupTODO:1 单位可选择 （默认跟随全局还是mm？）放弃原因：做边框用个毛线英制
 # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
 # 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
-
+# 对于自动设定参数功能：目前有下述问题
+            # 这样做有个缺点就是：
+            # 1、板子上所有的元素都被用来计算包围盒了，倒是可以利用这个手动标记边界
+            # 2、如上，板子本来就有边框的话就不能识别正确的大小，不过可以加入勾选删除边框的功能，
+            # 或者手工按钮删除边框。
+            # 3、 注意，之前添加在用户注释层上的东西，也会被包围进去（TODO:想办法排除无关元素）
+            # TODO:fix this ,make it better
+            # TODO:设置加一条，自动设置参数的时候直接应用而不用确认（提前标记好了可以这样做）
+            # TODO:由于自动设置好之后手工调整比较麻烦，
+            # 所以添加功能：鼠标滚轮在输入框上滚动的时可以调整值的大小，同时调整之后实时更新生成的边框
+            # 不过实时更新的事件来源是鼠标滚动，不能是数值变化，不然前面手动输入的时候就会没输入完四个值就更新了（好像这样也可以？）
+            # 这样的话就要获取自己添加的元素的id，每次生成的时候删除上一次生成的，否则就会一直叠加。
+            # 设置里面添加关闭这个的功能，避免误触。。感觉也不会（先不做
+            # TODO:限制边框尺寸精度，不然会给人造成错觉
+            # TODO:添加功能，不依赖记录id的情况下删除edge。cuts元素或者最外层edgecuts（暂时不用）
+#
 
 #3 等后面复选框没有bug了在看看文档层能不能吸附圆心 更新：这里确认了圆心基本不能自动吸附在不对其网格的点上，功能本来就是为了摆放安装孔方便，所以这个功能暂时不做了
 # 0 语言忘差不多了，写法得看看了
 #2 todo:添加脚本功能类似openscad编辑边框形状
 # 分段的边框添加到一个组里面避免移动困难（可选）
 # 圆心标记功能添加到高级里面可以取消
-#更新表单：
+
+# 更新表单：
 # 2022 12 之前的就不说了
 # 1、更新默认线宽为0.1mm，因为kicad的默认是这么多，以免看着不舒服。
 # 2、又该回去了默认线宽，因为jlc开槽精度到不了那么大，太细的线会有错觉（
@@ -45,6 +59,7 @@ from pcbnew import *
 # 4、准备添加一个右键菜单，已经做了但是没加功能
 # 5、添加打开插件就先刷新pcb的代码，避免有文件修改
 # 6、更新TODO项目，完成添加层可选的功能
+# 7、 添加自适应参数功能，妈妈再也不用担心我要手动写参数了。
 # Fixed：
 # 1#原始问题：不知道为什么这样会算不出来宽度，也没报错就运行不了
 # 解决：--- 输入线宽需要是整数，已经修复，后续可以添加调整线宽的功能
@@ -60,7 +75,15 @@ def alert(s, icon=0):
     print(s)
     wx.MessageBox(s, '阿巴阿巴title', wx.OK|icon)
     
-
+# 方便调试的时候加载板子所以写了个函数来区分
+def mLoadBoard():
+    isDebug = True if sys.gettrace() else False
+    if isDebug:
+        pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        boardobj=pcbnew.LoadBoard(pcbfile)
+    else:
+        boardobj = pcbnew.GetBoard()
+    return boardobj
 
 
 # 这里这些是主要的shape类型
@@ -74,8 +97,8 @@ def alert(s, icon=0):
 # SHAPE_T_SEGMENT pcbnew
 # SHAPE_TYPE_asString pcbnew
 #添加方形板框，参数长宽 起始点,线段宽度,指定层，
-def AddRectShape(shape_length,shape_width,segmentWidth,x0,y0,chosenLayer):
-    boardObj = pcbnew.GetBoard()
+def AddRectShape(shape_length,shape_width,segmentWidth,x0,y0,chosenLayer,boardObj):
+    # boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments.SetShape(pcbnew.SHAPE_T_RECT)#设置为方形
@@ -94,8 +117,8 @@ def AddRectShape(shape_length,shape_width,segmentWidth,x0,y0,chosenLayer):
 #添加圆角矩形 
 # TODO:需要用丝印或者什么元素标记圆角中心点方便手动添加安装孔（暂时搁置，加了，效果不好）
 # TODO:这里多段添加，添加到一个组里面方便整体挪动（有没有必要？）
-def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chosenLayer):
-    boardObj = pcbnew.GetBoard()
+def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chosenLayer,boardObj):
+    # boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
 
     # 左上角的圆角 
@@ -190,10 +213,10 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     boardObj.Add(shape_seg_D)
     #继承 EDA_SHAPE的属性可以添加圆弧和贝塞尔曲线       
     # 添加用户注释层圆角的圆心：
-    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
-    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
-    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
-    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False)
+    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False,boardObj=boardObj)
+    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False,boardObj=boardObj)
+    AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False,boardObj=boardObj)
+    AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.Cmts_User,isFill=True,isLocked=False,boardObj=boardObj)
     # # 添加在边框层的圆心
     # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
     # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_ra,pcbnew.Edge_Cuts,isFill=True,isLocked=False)
@@ -206,8 +229,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
 #添加圆形shape
 # TODO：圆形的参数应该用直径还是半径？
-def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLocked=False):
-    boardObj = pcbnew.GetBoard()
+def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLocked=False,boardObj=None):
+    # boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments.SetShape(pcbnew.SHAPE_T_CIRCLE)#设置为圈.SetShape(pcbnew.S_ARC)
@@ -362,9 +385,14 @@ class Dialog(wx.Dialog):
         self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(28,10))#,size=DefaultSize)
         self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
 
+        autoSetText = '自动设置参数'
+        self.autoSetBtn = wx.Button(self.panel,wx.ID_ANY,label=autoSetText,pos=Em(2,10))#,size=DefaultSize)
+        self.autoSetBtn.Bind(wx.EVT_BUTTON,self.autoSetNiceParams)
         # testText = 'ScriptEdit'
         # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
         # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
+
+        # ---------combobox----------
         self.layerCombBoxChoices = []
         # print(pcbnew.PCB_LAYER_ID_COUNT)
         
@@ -402,18 +430,25 @@ class Dialog(wx.Dialog):
 
         
         # Create the menu创建右键菜单
-
         self.rightMenu = wx.Menu()
+
         self.rightMenuItem0 = wx.MenuItem( 
                             self.rightMenu, 
                             wx.ID_ANY, 
                             u"打开设置",
                             wx.EmptyString, wx.ITEM_NORMAL )
         self.rightMenu.Append( self.rightMenuItem0 )
+        # self.rightMenuItemAutoSet = wx.MenuItem( 
+        #             self.rightMenu, 
+        #             wx.ID_ANY, 
+        #             u"自动设置参数",
+        #             wx.EmptyString, wx.ITEM_NORMAL)
         #添加一个分割，和上面的设置分开
         self.rightMenu.AppendSeparator()
         self.rightMenu.Append(wx.ID_REFRESH, "刷新PCB")# 右键刷新pcb
         self.rightMenu.Append(wx.ID_ANY, "TODO2")
+        # self.rightMenu.Append(self.rightMenuItemAutoSet)#点击自动设置参数 
+        # TODO:自动设置参数应该放到界面上才方便使用，这里就先不做了
         #添加一个分割 后面是checkitem
         self.rightMenu.AppendSeparator()
         self.rightMenu.AppendCheckItem(wx.ID_ANY, "TODO3")
@@ -438,10 +473,11 @@ class Dialog(wx.Dialog):
 
 #--------------------根据板参数刷新ui上的选项--------------------
         #TODO:初始化界面里面不应该加载pcb，先凑合用，后面再改出去界面初始化加载和pcb加载分开
-        boardobj = pcbnew.GetBoard()
+        # boardobj = pcbnew.GetBoard()
+        boardobj = mLoadBoard()
         #------调试加载板子用------------TODO:debug here
-        pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
-        boardobj=pcbnew.LoadBoard(pcbfile)
+        # pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        # boardobj=pcbnew.LoadBoard(pcbfile)
         
         enabledLayerSet = boardobj.GetEnabledLayers()
         enabledLayers = enabledLayerSet.Seq()#使用seq方法获取layerset的对应的id的list
@@ -463,16 +499,17 @@ class Dialog(wx.Dialog):
     
     #点确认之后应用板框，添加到板子上
     def onClickConfirmBtn(self,event):
-        
         # (gr_rect (start 215.9 60.96) (end 228.6 71.12) (layer "Edge.Cuts") (width 0.2) (fill none) (tstamp 1799c71f-013d-402a-b710-c5585561a246))
         # (gr_line (start 196.85 53.34) (end 229.87 53.34) (layer "Edge.Cuts") (width 0.2) (tstamp cf625e85-a2c0-4557-8b5f-dc6b2e43c20d))
-        self.boardObj = pcbnew.GetBoard()
-        print(self.layerCombBox.GetStringSelection())
+        # self.boardObj = pcbnew.GetBoard()
+        self.boardobj = mLoadBoard()
+        # print(self.layerCombBox.GetStringSelection())
         # self.theLayer = 1
+        #获取层索引来写道指定层上
         layerindex=self.layerCombBoxChoices.index(self.layerCombBox.GetStringSelection())
         self.theLayer = self.layerIDlist[layerindex]
-        # pcbnew.LayerName(self.leau)
-        # pcbShape = pcbnew.PCB_SHAPE(self.boardObj)
+        
+        # pcbShape = pcbnew.PCB_SHAPE(self.boardobj)
         x0=float(self.PosX_Input.GetValue())*g_multiplier
         y0=float(self.PosY_Input.GetValue())*g_multiplier
         linewidth = int(float(g_multiplier)*self.lineWidth)#linewidth只接受整数
@@ -480,24 +517,20 @@ class Dialog(wx.Dialog):
         if(self.theShapeSelection == 0):
             x1=float(self.length_Input.GetValue())*g_multiplier
             y1=float(self.width_Input.GetValue())*g_multiplier
-
-
-            #
             # alert('anything')
             # alert('edge:%s'%type(self.lineWidth))
-            AddRectShape(x1,y1,linewidth,x0,y0,self.theLayer)
+            AddRectShape(x1,y1,linewidth,x0,y0,self.theLayer,self.boardobj)
         elif self.theShapeSelection == 1:
             x1=float(self.length_Input.GetValue())*g_multiplier
             y1=float(self.width_Input.GetValue())*g_multiplier
             ra = float(self.angleRadius_Input.GetValue())*g_multiplier
-            AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer)
+            AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer,self.boardobj)
         elif self.theShapeSelection == 2:
             r_circle=float(self.length_Input.GetValue())*g_multiplier
-            AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer)
-            AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False)#添加一个圆心标记
+            AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer,boardObj=self.boardobj)
+            AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False,boardObj=self.boardobj)#添加一个圆心标记
             # pass
         elif self.theShapeSelection == 3:
-
             pass
         elif self.theShapeSelection == 4:
             pass
@@ -521,6 +554,8 @@ class Dialog(wx.Dialog):
         # alert('select:%d'%self.shapeRbox.GetSelection())
         if(shapeKind==0):
             # alert('select:%d'%self.shapeRbox.GetSelection())
+            #set Value
+            self.length_Input.SetValue(str(100))
             #show
             self.Xtext.Show()
             self.Ytext.Show()
@@ -532,6 +567,8 @@ class Dialog(wx.Dialog):
             # 显示矩形长宽，左上角位置的填写框
         elif shapeKind==1:
             
+            #set Value
+            self.length_Input.SetValue(str(100))
             #show
             self.Xtext.Show()
             self.Ytext.Show()
@@ -546,6 +583,7 @@ class Dialog(wx.Dialog):
             # 显示圆弧半径，圆心x 圆心 y
             # 直接和矩形框的填写复用吧，改一下显示的条目就行
             # self.R_angle_text.Show()
+            self.length_Input.SetValue(str(50))
             self.Rtext.Show()
             # Hide
             self.R_angle_text.Hide()
@@ -584,9 +622,63 @@ class Dialog(wx.Dialog):
         dlg.ShowModal()
         # alert("Testingstp2")
         dlg.Destroy()
-    def findNiceParams(self, event):
+    # 自动找到合适板边框的参数并设置
+    # def findNiceParams(self, event):
+    #     event.Skip()
+    def autoSetNiceParams(self,event):
         event.Skip()
-        
+        #加载板子：
+        # boardobj = pcbnew.GetBoard()
+        boardobj = mLoadBoard()
+        #原本是打算获取所有元素的几何中心和边界的，结果发现有包围盒可以直接用
+        # board_X,board_Y = boardobj.GetCenter()
+        # xmm = pcbnew.ToMM(board_X)
+        # ymm = pcbnew.ToMM()
+        # 获取所有元素的包围盒
+        bbox = boardobj.ComputeBoundingBox()
+        # 计算边框的大小和位置
+        bdwidth = bbox.GetWidth()
+        bdheight = bbox.GetHeight()
+        bdx = bbox.GetX()
+        bdy = bbox.GetY()
+        centerX,centerY = bbox.GetCenter() #获取中心点
+        # 创建边框对象
+        # pcbnew.
+        # border = pcbnew.EDGE_MODULE(board)
+        # border.SetWidth(pcbnew.FromMM(2))  # 设置边框线宽为 2 mm
+        # border.SetLayer(pcbnew.F_SilkS)  # 设置边框在 F.SilkS 层
+
+        # 设置边框的大小和位置
+        # border.SetStart(pcbnew.wxPoint(x, y))
+        # border.SetEnd(pcbnew.wxPoint(x + width, y + height))
+        # 将边框添加到 PCB 上
+        # board.Add(border)
+        # print(pcbnew.ToMM(bdx))
+        #获取当前选的边缘类型
+        self.theShapeSelection = self.shapeRbox.GetSelection()
+        if (self.theShapeSelection == 0 or self.theShapeSelection==1):
+            # 圆角矩形和矩形的参数共用一套，不过 TODO:圆角矩形最好加个判断圆角内会不会有器件落入进入
+            self.PosX_Input.SetValue(str(pcbnew.ToMM(bdx)))
+            self.PosY_Input.SetValue(str(pcbnew.ToMM(bdy)))
+            self.length_Input.SetValue(str(pcbnew.ToMM(bdwidth)))
+            self.width_Input.SetValue(str(pcbnew.ToMM(bdheight)))
+        elif self.theShapeSelection==2:
+            #设置半径：
+            r_circle = 0.5*sqrt(pcbnew.ToMM(bdwidth)**2+pcbnew.ToMM(bdheight)**2)
+            self.length_Input.SetValue(str(r_circle))
+            self.width_Input.SetValue(str(r_circle))
+            #设置圆心
+            # centerX = pcbnew.ToMM(bdx+0.5*bdwidth)
+            self.PosX_Input.SetValue(str(pcbnew.ToMM(centerX)))
+            self.PosY_Input.SetValue(str(pcbnew.ToMM(centerY)))
+            # r_circle=float(self.length_Input.GetValue())*g_multiplier
+            # AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer,boardObj=self.boardobj)
+            #圆的参数单独获取，因为圆是从圆心出发的，直径应该是刚刚获取的包围框的长宽平方和开根号，
+            # 不过圆心坐标可以用center获取吧。
+        elif self.theShapeSelection==3:
+            pass
+        else:
+            event.Skip()
     def onLayerChoseChanged(self, event):
         pass
     #TODO:保留给其他的右键菜单按钮或者神
@@ -612,7 +704,7 @@ class Add_Shapes(pcbnew.ActionPlugin):
             mydialog.Center()
             mydialog.Show()
         except:
-            # mydialog.Destroy()
+            mydialog.Destroy()
             print("dead")
         # finally:
         #     pass

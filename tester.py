@@ -54,8 +54,8 @@ if __name__ == "__main__":
     isDebug = True if sys.gettrace() else False
     if isDebug:
         # global boardobj
-        pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
-        boardobj=pcbnew.LoadBoard(pcbfile)
+        # pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        # boardobj=pcbnew.LoadBoard(pcbfile)
         dialog=shape_para_set.Dialog(None)
         dialog.Show()
     else:
