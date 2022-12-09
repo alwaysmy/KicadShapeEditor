@@ -276,7 +276,8 @@ class Dialog(wx.Dialog):
         # self.Bind(wx.EVT_CLOSE, self.OnClose, id=self.GetId())
         icon=wx.Icon(self.icon_file_name)
         self.SetIcon(icon)#显示Logo图标
-        # self.BoxSizer = wx.BoxSizer(self)#TODO:设计器里面的流程是先加一个sizer？回头看看文档
+        # self.BoxSizer = wx.BoxSizer(self)
+        # #TODO:设计器里面的流程是先加一个sizer？回头看看文档,似乎加不加没影响
         bSizer_1 = wx.BoxSizer( wx.VERTICAL )
         self.panel = wx.Panel(self) #添加一个panel容纳元素 
         # self.panel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
@@ -365,7 +366,6 @@ class Dialog(wx.Dialog):
         # self.confirmBtn = wx.Button(self.panel,wx.ID_ANY,label=testText,pos=Em(16,11))#,size=DefaultSize)
         # self.confirmBtn.Bind(wx.EVT_BUTTON,self.onClickTestBtn)
         self.layerCombBoxChoices = []
-        
         # print(pcbnew.PCB_LAYER_ID_COUNT)
         
         # for i in range(pcbnew.PCB_LAYER_ID_COUNT):
@@ -440,8 +440,8 @@ class Dialog(wx.Dialog):
         #TODO:初始化界面里面不应该加载pcb，先凑合用，后面再改出去界面初始化加载和pcb加载分开
         boardobj = pcbnew.GetBoard()
         #------调试加载板子用------------TODO:debug here
-        # pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
-        # boardobj=pcbnew.LoadBoard(pcbfile)
+        pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        boardobj=pcbnew.LoadBoard(pcbfile)
         
         enabledLayerSet = boardobj.GetEnabledLayers()
         enabledLayers = enabledLayerSet.Seq()#使用seq方法获取layerset的对应的id的list
@@ -584,6 +584,9 @@ class Dialog(wx.Dialog):
         dlg.ShowModal()
         # alert("Testingstp2")
         dlg.Destroy()
+    def findNiceParams(self, event):
+        event.Skip()
+        
     def onLayerChoseChanged(self, event):
         pass
     #TODO:保留给其他的右键菜单按钮或者神
