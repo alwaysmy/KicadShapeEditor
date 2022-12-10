@@ -85,7 +85,7 @@ def alert(s, icon=0):
 def mLoadBoard():
     isDebug = True if sys.gettrace() else False
     if isDebug:
-        pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        pcbfile = r'D:\MyProjects\2_MyDesigns\SoftwareCodes\1_PluginsCodes\KiCadPlugins\TestKicadPrj\TestKicadPrj.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
         boardobj=pcbnew.LoadBoard(pcbfile)
     else:
         boardobj = pcbnew.GetBoard()
