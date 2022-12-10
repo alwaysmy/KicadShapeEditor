@@ -3,7 +3,7 @@ import shape_para_set
 import sys
 import pcbnew
 
-class MyDialog(wx.Dialog):
+class SettingDialog(wx.Dialog):
     def __init__(self, parent):
         super().__init__(parent, title="My Dialog")
         self.SetSize((300, 200))
