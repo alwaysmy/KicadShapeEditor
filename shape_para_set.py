@@ -4,6 +4,7 @@ import os
 import wx
 from pcbnew import *
 import sys
+import SettingInterface as mSetting
 # Import the gettext module,用于执行不同翻译
 # import gettext 
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
@@ -12,7 +13,7 @@ import sys
 # TODO：AddDimensionToBoard函数内一些写死的值改一下
 # TODO: 位置坐标分到一组，大小分为一组，位置坐标增加可选中心还是左上角为坐标点。
 # TODO: 增加选项，添加边框的时候删除原来的边框
-# TODO：添加高级选项功能
+# TODO：添加高级选项功能--就是设置
 # TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面# 生成线宽可选
 # TODO :添加功能配置记录，用来存放配置和用来每次打开的时候读取上一次保存的记录
 # TODO:增加退出的时候自动保存配置，打开的时候自动加载上一次配置（增加在设置里面选择是否记忆）
@@ -229,18 +230,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # AddRoundShape(1,250000*2,x0+shape_length-shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
     # AddRoundShape(1,250000*2,x0+shape_ra,y0+shape_width-shape_ra,pcbnew.F_Cu,isFill=True,isLocked=False)
     
-    # 添加所有元素到shapeGroup里面：应该不需要做可选，因为解组很容，，
-    boardObj.Add(shape_segments)
-    boardObj.Add(arc_ur)
-    boardObj.Add(arc_dr)
-    boardObj.Add(arc_dl) 
-    boardObj.Add(shape_seg_L)
-    boardObj.Add(shape_seg_U)
-    boardObj.Add(shape_seg_R)
-    boardObj.Add(shape_seg_D)
-    #目前测试这里要先单独加到板子上然后加到组里才行。。。不知道为什么不能直接加组 
-    # 看别人写的一样的直接加到组里就没问题啊
-    # TODO:有需要再修
+
+
     shapeGroup = pcbnew.PCB_GROUP(boardObj)
     shapeGroup.AddItem(shape_segments)
     shapeGroup.AddItem(arc_ur)
@@ -250,12 +241,27 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     shapeGroup.AddItem(shape_seg_U)
     shapeGroup.AddItem(shape_seg_R)
     shapeGroup.AddItem(shape_seg_D)
-    
     shapeGroup.SetName("RRectGroup")
-    boardObj.Add(shapeGroup)
+    # 添加所有元素到shapeGroup里面：应该不需要做可选，因为解组很简单，但是添加组很累，，
+    boardObj.Add(shape_segments)
+    boardObj.Add(arc_ur)
+    boardObj.Add(arc_dr)
+    boardObj.Add(arc_dl) 
+    boardObj.Add(shape_seg_L)
+    boardObj.Add(shape_seg_U)
+    boardObj.Add(shape_seg_R)
+    boardObj.Add(shape_seg_D)
+    # for bdITEM in shapeGroup.GetItems():#不支持迭代，，不知道怎么取出来
+    #     print(bdITEM)
+    #     boardObj.Add(bdITEM)
+    boardObj.Add(shapeGroup)#这里如果不加就会导致操作pcbnew的时候其崩溃
+
+    # a=shapeGroup.m_Uuid(id不是一个字符串，需要转换)
+    # print(a)
+    # print(shapeGroup.m_Uuid)
     # ----调试保存
-    pathpcb = boardObj.GetFileName()
-    boardObj.Save(pathpcb)
+    # pathpcb = boardObj.GetFileName()
+    # boardObj.Save(pathpcb)
     # pcbnew.Refresh()
     # return shapeGroup
 
@@ -397,7 +403,7 @@ class Dialog(wx.Dialog):
         #-----------------------设定窗口信息------------------
         InitEm()
         funcName =      '外形生成'#illet board edges
-        version  =      'v0.10109'
+        version  =      'v0.15'
         shapeRboxLable = '外形类型'
         self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png') #图标
         # self.manufacturers_dir = os.path.join(os.path.dirname(__file__), 'Manufacturers')
@@ -755,8 +761,10 @@ class Dialog(wx.Dialog):
     def onClickTestBtn(self,event):
         # TODO:需要修改
         # alert("刷新")
-        #下面方法不确定有没有效果,测试是并不能从文件中重新加载
+        
         pcbnew.Refresh()
+        #下面方法不确定有没有效果,测试是并不能从文件中重新加载，同时下面这一坨可能会导致pcb添加组的时候
+        # 保存的时候崩溃。虽然引用的地方都是按键，但是就是这么奇妙，我好像也就修改了这里修好这个问题的。。。
         # Get the current PCB
         # pcb = pcbnew.GetBoard()
         # # Get the file path of the PCB
@@ -775,7 +783,8 @@ class Dialog(wx.Dialog):
     def OpenSetting(self, event):
         event.Skip()
         # alert("Testing")
-        dlg = wx.Dialog(None, title="TestDialog")
+        
+        dlg = mSetting.MyDialog(self)
         dlg.ShowModal()
         dlg.Destroy()
     #     event.Skip()
