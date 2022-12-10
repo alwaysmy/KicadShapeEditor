@@ -4,7 +4,7 @@ import os
 import wx
 from pcbnew import *
 import sys
-import SettingInterface as mSetting
+# import SettingInterface as mSetting  #为什么引入库会导致插件加载失败？？在命令行里面打开是可以的
 # Import the gettext module,用于执行不同翻译
 # import gettext 
 #this plugin is deved for KiCad 6.0.x 只适配了kicad6的api
@@ -784,7 +784,8 @@ class Dialog(wx.Dialog):
         event.Skip()
         # alert("Testing")
         
-        dlg = mSetting.MyDialog(self)
+        # dlg = mSetting.MyDialog(self)
+        dlg = wx.Dialog(None, title="TestDialog")
         dlg.ShowModal()
         dlg.Destroy()
     #     event.Skip()
