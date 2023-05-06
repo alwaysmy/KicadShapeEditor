@@ -1,6 +1,7 @@
+import sys
 import wx
 import shape_para_set
-import sys
+
 import pcbnew
 # import pcbnew
 #这个tester.py是个启动器，用来调界面的，使用kicad的环境就行。

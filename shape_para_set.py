@@ -22,7 +22,7 @@ import sys
 # TODO： 添加预览界面
 # TODO: 输入数字框换成wxspinctrldouble（不一定做）
 # TODO: 添加一键还原默认设置（放右键菜单里面）
-# giveupTODO:1 单位可选择 （默认跟随全局还是mm？）放弃原因：做边框用个毛线英制
+# giveupTODO 1 单位可选择 （默认跟随全局还是mm？）放弃原因：做边框用个毛线英制
 # 选择边框类型 设置边框大小（圆角大小）（是否添加四角固定孔封装），
 # 删除原来的闭合边框（），自动判断坐标（手动设定左上角或者中心坐标）|一键导入外部DXF 一键导入其他pcb文件板框，支持openscad多边形语法
 # 对于自动设定参数功能：目前有下述问题
@@ -70,18 +70,31 @@ import sys
 # 解决：--- 输入线宽需要是整数，已经修复，后续可以添加调整线宽的功能
 # 2修复了删除被添加的边框后被回显出来的bug（改dialog的显示方法为show而不是showModal，摸不着头脑
 # 但是保留刷新按键，方便一些别的改文件操作 TODO:实际上板子不重新打开pcbnew编辑器是不会从文件重新加载板子的，所以这里没用，起码refresh没用，去掉或者修改。
-# 3 
+# 3 7.0中打开新菜单没问题
 # #-----其他记录---------------
 # 增加了一个layerDict用来存储当前板子的层的名称和序号，其实用不用无所谓，放着吧
 # 不过这个刷新板子并获取数据的位置不太好，不应该放在ui初始化中间，后面再修改
 UNITS = ["mm", "in"]#可以直接从kicad的pcbnew的对象来获取
 g_multiplier = 1000000#KiCad中数字的单位是10^-6 mm 所以要乘回去
-
+kicadVersionFlag = 7 #随便写的放在这里初始化一下
 #
 def alert(s, icon=0):
     print(s)
     wx.MessageBox(s, '阿巴阿巴title', wx.OK|icon)
+
+def pcbPos(x,y):
+        # 有的这里没有6 7 通用的方法，只能分开写
+    # print("kicadversion"+str(kicadVersionFlag))
+    if kicadVersionFlag == 6:
+        return wxPoint(int(x),int(y))
+    elif kicadVersionFlag ==7:
+        return (VECTOR2I(int(x),int(y)))  
     
+def pcbangle(ang):
+    if kicadVersionFlag == 6:
+        return ang  
+    elif kicadVersionFlag ==7:
+        return EDA_ANGLE(ang,TENTHS_OF_A_DEGREE_T)
 # 方便调试的时候加载板子所以写了个函数来区分
 def mLoadBoard():
     isDebug = True if sys.gettrace() else False
@@ -105,21 +118,35 @@ def mLoadBoard():
 # SHAPE_TYPE_asString pcbnew
 #添加方形板框，参数长宽 起始点,线段宽度,指定层，
 def AddRectShape(shape_length,shape_width,segmentWidth,x0,y0,chosenLayer,boardObj):
+    
+
     # boardObj = pcbnew.GetBoard()
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments.SetShape(pcbnew.SHAPE_T_RECT)#设置为方形
 
-    shape_segments.SetStart(wxPoint(x0,y0))
-    # shape_segments.SetEnd(wxPoint(x0+shape_length,y0+shape_width))
-    shape_segments.SetEnd(wxPoint(x0+shape_length,y0+shape_width))
+    # shape_segments.SetStart(wxPoint(x0,y0))
+
+    # shape_segments.SetEnd(wxPoint(x0+shape_length,y0+shape_width))  #kicad6.0中坐标数值类型是wxpoint 在kicad7.0中改成了VECTOR2I 因此这里改成下面的写法兼容性会更好
+
+    # 只考虑整形即可
+    shape_segments.SetStartX(int(x0))
+    shape_segments.SetStartY(int(y0))
+    shape_segments.SetEndX(int(x0+shape_length))
+    shape_segments.SetEndY(int(y0+shape_width))
 
     shape_segments.SetWidth(segmentWidth)#250000
-    shape_segments.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
-
+    shape_segments.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START
     # if hasattr(shape_segments,'SetTimeStamp'):   #不要也没事
-    #     shape_segments.SetTimeStamp(ts)
+    #     #     shape_segments.SetTimeStamp(ts)
+    
+    # pcbnew.BOARD_ITEM_CONTAINER.IsOnLayer(chosenLayer)
+    # if shape_segments.IsOnLayer(chosenLayer) is True:
+    #     pcbnew.Refresh()
+    # else:
+    #     boardObj.Add(shape_segments)
     boardObj.Add(shape_segments)
+    
 
 #添加圆角矩形 
 def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chosenLayer,boardObj):
@@ -127,15 +154,19 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # shape_segments = pcbnew.PCB_SHAPE(boardObj)
     
     # 左上角的圆角 
-    # TODO:不知道为啥这里改了PCBshape的变量名就会有问题，以后再说  
+    # TODO:不知道为啥这里改了PCBshape的变量名就会有问题，以后再说  似乎只是自己上下文不对 
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments.SetShape(pcbnew.SHAPE_T_ARC)#设置为圆弧
     # 第一个圆角，坐标是（x0-r,y0-r),起始点是（x0-r,y0)
-    shape_segments.SetStart(wxPoint(x0,y0+shape_ra))
-    shape_segments.SetCenter(wxPoint(x0+shape_ra,y0+shape_ra))
-    # shape_segments.SetEnd(wxPoint(x0+shape_ra,y0)) #这样写是顺时针270°不带角度的话      
-    # shape_segments.SetArcGeometry(wxPoint(x0,y0+shape_ra),wxPoint(x0+shape_ra,y0+shape_ra),wxPoint(x0+shape_ra,y0))#中点是弧的中点
-    shape_segments.SetArcAngleAndEnd(900.0)
+    shape_segments.SetStart(pcbPos(x0,y0+shape_ra))
+
+    shape_segments.SetCenter(pcbPos(x0+shape_ra,y0+shape_ra))
+    # shape_segments.SetEnd(pcbPos(x0+shape_ra,y0)) #这样写是顺时针270°不带角度的话      
+    # shape_segments.SetArcGeometry(pcbPos(x0,y0+shape_ra),pcbPos(x0+shape_ra,y0+shape_ra),pcbPos(x0+shape_ra,y0))#中点是弧的中点
+    # shape_segments.SetArcAngleAndEnd(900.0)
+    # shape_segments.SetArcAngleAndEnd(EDA_ANGLE(900.0,DEGREES_T))
+    shape_segments.SetArcAngleAndEnd(pcbangle(900.0))
+
 
     shape_segments.SetWidth(segmentWidth)#250000q
     shape_segments.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
@@ -145,10 +176,10 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # 右上角的圆角
     arc_ur = pcbnew.PCB_SHAPE(boardObj)
     arc_ur.SetShape(pcbnew.SHAPE_T_ARC)#设置为圆弧
-    arc_ur.SetStart(wxPoint(x0+shape_length-shape_ra,y0))
-    arc_ur.SetCenter(wxPoint(x0+shape_length-shape_ra,y0+shape_ra))
-    arc_ur.SetArcAngleAndEnd(900.0)#顺时针90度，..既然是double为啥还要用0.1做单位度。。
-    # arc_ur.SetEnd(wxPoint(x0+shape_ra,y0))
+    arc_ur.SetStart(pcbPos(x0+shape_length-shape_ra,y0))
+    arc_ur.SetCenter(pcbPos(x0+shape_length-shape_ra,y0+shape_ra))
+    arc_ur.SetArcAngleAndEnd(pcbangle(900.0))#顺时针90度，..既然是double为啥还要用0.1做单位度。。
+    # arc_ur.SetEnd(pcbPos(x0+shape_ra,y0))
     arc_ur.SetWidth(segmentWidth)#250000q
     arc_ur.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
     # if hasattr(shape_segments,'SetTimeStamp'):   #不要也没事
@@ -157,10 +188,10 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # 右下角的圆角
     arc_dr = pcbnew.PCB_SHAPE(boardObj)
     arc_dr.SetShape(pcbnew.SHAPE_T_ARC)#设置为圆弧
-    arc_dr.SetStart(wxPoint(x0+shape_length,y0+shape_width-shape_ra))
-    arc_dr.SetCenter(wxPoint(x0+shape_length-shape_ra,y0+shape_width-shape_ra))
-    arc_dr.SetArcAngleAndEnd(900.0)
-    # arc_ur.SetEnd(wxPoint(x0+shape_ra,y0))
+    arc_dr.SetStart(pcbPos(x0+shape_length,y0+shape_width-shape_ra))
+    arc_dr.SetCenter(pcbPos(x0+shape_length-shape_ra,y0+shape_width-shape_ra))
+    arc_dr.SetArcAngleAndEnd(pcbangle(900.0))
+    # arc_ur.SetEnd(pcbPos(x0+shape_ra,y0))
     arc_dr.SetWidth(segmentWidth)#250000q
     arc_dr.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
     # if hasattr(shape_segments,'SetTimeStamp'):   #不要也没事
@@ -168,10 +199,10 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     
     arc_dl = pcbnew.PCB_SHAPE(boardObj)
     arc_dl.SetShape(pcbnew.SHAPE_T_ARC)#设置为圆弧
-    arc_dl.SetStart(wxPoint(x0+shape_ra,y0+shape_width))
-    arc_dl.SetCenter(wxPoint(x0+shape_ra,y0+shape_width-shape_ra))
-    arc_dl.SetArcAngleAndEnd(900.0)
-    # arc_ur.SetEnd(wxPoint(x0+shape_ra,y0))
+    arc_dl.SetStart(pcbPos(x0+shape_ra,y0+shape_width))
+    arc_dl.SetCenter(pcbPos(x0+shape_ra,y0+shape_width-shape_ra))
+    arc_dl.SetArcAngleAndEnd(pcbangle(900.0))
+    # arc_ur.SetEnd(pcbPos(x0+shape_ra,y0))
     arc_dl.SetWidth(segmentWidth)#250000q
     arc_dl.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
     # if hasattr(shape_segments,'SetTimeStamp'):   #不要也没事
@@ -181,8 +212,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     shape_seg_L = pcbnew.PCB_SHAPE(boardObj)
     shape_seg_L.SetShape(pcbnew.SHAPE_T_SEGMENT)#设置为线段
     # 
-    shape_seg_L.SetStart(wxPoint(x0,y0+shape_ra))
-    shape_seg_L.SetEnd(wxPoint(x0,y0+shape_width-shape_ra))
+    shape_seg_L.SetStart(pcbPos(x0,y0+shape_ra))
+    shape_seg_L.SetEnd(pcbPos(x0,y0+shape_width-shape_ra))
 
     shape_seg_L.SetWidth(segmentWidth)#250000
     shape_seg_L.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
@@ -190,8 +221,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # 上方线段
     shape_seg_U = pcbnew.PCB_SHAPE(boardObj)
     shape_seg_U.SetShape(pcbnew.SHAPE_T_SEGMENT)#设置为线段
-    shape_seg_U.SetStart(wxPoint(x0+shape_ra,y0))
-    shape_seg_U.SetEnd(wxPoint(x0+shape_length-shape_ra,y0))
+    shape_seg_U.SetStart(pcbPos(x0+shape_ra,y0))
+    shape_seg_U.SetEnd(pcbPos(x0+shape_length-shape_ra,y0))
 
     shape_seg_U.SetWidth(segmentWidth)#250000
     shape_seg_U.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
@@ -199,8 +230,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # 右侧线段
     shape_seg_R = pcbnew.PCB_SHAPE(boardObj)
     shape_seg_R.SetShape(pcbnew.SHAPE_T_SEGMENT)#设置为线段
-    shape_seg_R.SetStart(wxPoint(x0+shape_length,y0+shape_ra))
-    shape_seg_R.SetEnd(wxPoint(x0+shape_length,y0+shape_width-shape_ra))
+    shape_seg_R.SetStart(pcbPos(x0+shape_length,y0+shape_ra))
+    shape_seg_R.SetEnd(pcbPos(x0+shape_length,y0+shape_width-shape_ra))
 
     shape_seg_R.SetWidth(segmentWidth)#250000
     shape_seg_R.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
@@ -208,8 +239,8 @@ def AddRoundRectShape(shape_length,shape_width,shape_ra,segmentWidth,x0,y0,chose
     # 下侧线段
     shape_seg_D = pcbnew.PCB_SHAPE(boardObj)
     shape_seg_D.SetShape(pcbnew.SHAPE_T_SEGMENT)#设置为线段
-    shape_seg_D.SetStart(wxPoint(x0+shape_ra,y0+shape_width))
-    shape_seg_D.SetEnd(wxPoint(x0+shape_length-shape_ra,y0+shape_width))
+    shape_seg_D.SetStart(pcbPos(x0+shape_ra,y0+shape_width))
+    shape_seg_D.SetEnd(pcbPos(x0+shape_length-shape_ra,y0+shape_width))
 
     shape_seg_D.SetWidth(segmentWidth)#250000
     shape_seg_D.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
@@ -274,10 +305,10 @@ def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLoc
     shape_segments = pcbnew.PCB_SHAPE(boardObj)
     shape_segments.SetShape(pcbnew.SHAPE_T_CIRCLE)#设置为圈.SetShape(pcbnew.S_ARC)
 
-    # shape_segments.SetCenter(wxPoint(x0,y0))
-    shape_segments.SetStart(wxPoint(x0,y0))
-    # shape_segments.SetEnd(wxPoint(x0+shape_length,y0+shape_width))
-    shape_segments.SetEnd(wxPoint(x0+shape_radius,y0))
+    # shape_segments.SetCenter(pcbPos(x0,y0))
+    shape_segments.SetStart(pcbPos(x0,y0))
+    # shape_segments.SetEnd(pcbPos(x0+shape_length,y0+shape_width))
+    shape_segments.SetEnd(pcbPos(x0+shape_radius,y0))
 
     shape_segments.SetWidth(segmentWidth)#
     shape_segments.SetLayer(chosenLayer)#PCBNEW_LAYER_ID_START 
@@ -288,6 +319,7 @@ def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLoc
     # if hasattr(shape_segments,'SetTimeStamp'):   #不要这段也没事
     #     shape_segments.SetTimeStamp(ts)
     boardObj.Add(shape_segments)
+    
 # 这个还没做TODO,添加用openscad描述的自定义形状（不实用）
 def AddScadShape(segmentWidth,chosenLayer):
     pass
@@ -306,29 +338,51 @@ def AddDimensionToBoard(x0,y0,x1,y1,boardObj):
     #构建一个标注（dimension）
     x_end = x0+x1
     y_end = y0+y1
-    dimensionObj = pcbnew.PCB_DIM_ALIGNED(boardObj)#PCB_DIM_CENTER是个十字，不知道具体会变成咋样，应该使用aligned才能正确显示标注
+    dimensionObj = pcbnew.PCB_DIM_ALIGNED(aParent = boardObj,aType=PCB_DIM_ALIGNED_T)#PCB_DIM_CENTER是个十字，不知道具体会变成咋样，应该使用aligned才能正确显示标注
+    
     dimensionObj.SetLayer(pcbnew.Cmts_User)
-    dimensionObj.SetStart(wxPoint(x0,y0))#TODO:如果是圆角矩形需要进动一点（不改也行）
-    dimensionObj.SetEnd(wxPoint(x_end,y_end))
+
+    # 这里没有6 7 通用的方法，只能分开写
+    # if kicadVersionFlag == 6:
+    #     dimensionObj.SetStart(wxPoint(x0,y0))     #TODO:如果是圆角矩形需要进动一点（不改也行）
+    #     dimensionObj.SetEnd(wxPoint(x_end,y_end))
+    # elif kicadVersionFlag ==7:
+    #     dimensionObj.SetStart(VECTOR2I(x0,y0))
+    dimensionObj.SetStart(pcbPos(x0,y0))
+    dimensionObj.SetEnd(pcbPos(x_end,y_end))
 
     #设置标注文本--- TODO:这里的方法可能存在问题，需要修改,是用于临时解决不重新加载板子的情况下刷新出来注释的方法
     # dimensionObj.SetText('t')
     # dimensionObj.GetMeasuredValue()
     # dimensionObj.SetMeasuredValue(2*g_multiplier)
     # dimensionObj.SetText("test")
-    dimText=dimensionObj.Text()
-    # dimText.SetLayer
-    dimText.SetText("Test")#能设置，但是只能设置一会儿
+    if kicadVersionFlag==6:
+            # 6.0可用写法 7.0废弃
+        dimText=dimensionObj.Text()
+        # dimText.SetLayer
+        dimText.SetText("Test")#能设置，但是只能设置一会儿
+            #设置标注偏离测量点多远以及文本位置
+        if x1==0:
+            dimensionObj.SetHeight(int(4*g_multiplier))#向左边拓4mm，如果是圆角矩形进动了，要加上半径
+            dimText.SetPosition(pcbPos(x0-8,y0))
+        elif y1==0:
+            dimensionObj.SetHeight(int(-4*g_multiplier))#向上边拓4mm
+            dimText.SetPosition(pcbPos(x0,y0+8))
+
+    elif kicadVersionFlag ==7:
+        dimensionObj.SetText("Test")
+        if x1==0:
+            dimensionObj.SetHeight(int(4*g_multiplier))#向左边拓4mm，如果是圆角矩形进动了，要加上半径
+            dimensionObj.SetTextPos(pcbPos(x0-8,y0))
+        elif y1==0:
+            dimensionObj.SetHeight(int(-4*g_multiplier))#向上边拓4mm
+            dimensionObj.SetTextPos(pcbPos(x0,y0+8))
+            pass
+
     
-    #设置标注偏离测量点多远以及文本位置
-    if x1==0:
-        dimensionObj.SetHeight(int(4*g_multiplier))#向左边拓4mm，如果是圆角矩形进动了，要加上半径
-        dimText.SetPosition(wxPoint(x0-8,y0))
-    elif y1==0:
-        dimensionObj.SetHeight(int(-4*g_multiplier))#向上边拓4mm
-        dimText.SetPosition(wxPoint(x0,y0+8))
+
     #设置标注线format
-    dimensionObj.SetUnits(pcbnew.EDA_UNITS_MILLIMETRES)#可以设置自动单位，但是拒绝英制
+    dimensionObj.SetUnits(pcbnew.EDA_UNITS_MILLIMETRES)#可以设置自动单位，但是拒绝英制,所以我写死了设置公制
     dimensionObj.SetUnitsFormat(1)
     dimensionObj.SetPrecision(4)
     #设置标注style
@@ -400,6 +454,16 @@ class Dialog(wx.Dialog):
             chsize=(tx[0]*1.1,tx[1]*1.5)
         def Em(x,y,dx=0,dy=0):
             return (chsize[0]*x+dx, chsize[1]*y+dy)
+        #-----------------------获取当前Kicad 版本号来调整API----------------
+        global kicadVersionFlag
+        kicadVersion = pcbnew.GetMajorMinorVersion()    # 获取住主要版本号 例如7.0
+        kicadversion1 = pcbnew.GetMajorMinorVersion()  #获取完整版本号 例如7.0.2
+        if kicadVersion == '7.0':
+            kicadVersionFlag = 7 #手工标记防止判断条件改变后面还要改
+        elif kicadVersion == '6.0':
+            kicadVersionFlag = 6
+        else:
+            pass #更低版本不打算支持，更高版本现在还没出呢
 
         #-----------------------设定窗口信息------------------
         InitEm()
@@ -470,7 +534,7 @@ class Dialog(wx.Dialog):
         # alert('select:%d'%self.shapeRbox.GetSelection())
         # ----------文本----------
         # X坐标和Y坐标文本
-        xytxt = '位置坐标'
+        xytxt = '位置坐标 (mm)'
         self.Xytext = wx.StaticText(self.panel, wx.ID_ANY, label=xytxt, pos=Em(2,4))#, size, style)
         xtxt = "X:"
         self.Xtext = wx.StaticText(self.panel, wx.ID_ANY, label=xtxt, pos=Em(2,5))#, size, style)
@@ -572,7 +636,8 @@ class Dialog(wx.Dialog):
         # TODO:自动设置参数应该放到界面上才方便使用，这里就先不做了
         #添加一个分割 后面是checkitem
         self.rightMenu.AppendSeparator()
-        self.rightMenu.AppendCheckItem(wx.ID_ANY, "TODO3")
+        self.rightMenu.AppendCheckItem(wx.ID_ANY, "添加圆心标记")
+        
         #添加一个分割 后面是radioitem
         self.rightMenu.AppendSeparator()
         self.rightMenu.AppendRadioItem(wx.ID_ANY, "TODO2")
@@ -645,12 +710,14 @@ class Dialog(wx.Dialog):
             x1=float(self.length_Input.GetValue())*g_multiplier
             y1=float(self.width_Input.GetValue())*g_multiplier
             ra = float(self.angleRadius_Input.GetValue())*g_multiplier
-            AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer,self.boardobj)
+            AddRoundRectShape(x1,y1,ra,linewidth,x0,y0,self.theLayer,self.boardobj) # TODO: 这个圆心标记写道函数里面了要改。。
             # self.boardobj.Add(SHgroup)#不起作用
         elif self.theShapeSelection == 2:
             r_circle=float(self.length_Input.GetValue())*g_multiplier
             AddRoundShape(r_circle,linewidth,x0,y0,self.theLayer,boardObj=self.boardobj)
             #添加一个圆心标记用来方便自动对齐
+
+            # if self.rightMenu.FindItem("添加圆心标记").IsChecked() is True:
             AddRoundShape(1,linewidth,x0,y0,pcbnew.Cmts_User,isFill=True,isLocked=False,boardObj=self.boardobj)
             # pass
         elif self.theShapeSelection == 3:
@@ -802,8 +869,8 @@ class Dialog(wx.Dialog):
         # border.SetLayer(pcbnew.F_SilkS)  # 设置边框在 F.SilkS 层
 
         # 设置边框的大小和位置
-        # border.SetStart(pcbnew.wxPoint(x, y))
-        # border.SetEnd(pcbnew.wxPoint(x + width, y + height))
+        # border.SetStart(pcbnew.pcbPos(x, y))
+        # border.SetEnd(pcbnew.pcbPos(x + width, y + height))
         # 将边框添加到 PCB 上
         # board.Add(border)
         # print(pcbnew.ToMM(bdx))
