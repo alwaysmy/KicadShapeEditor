@@ -18,8 +18,11 @@ Kicad7.0已经集成了倒角（圆角功能，画框之后右键-圆角线）�
 
 ## 1.用法：
 
-打包下载或者git clone到自己的kicad插件目录下（解压),刷新插件列表就行。比如：``C:\Program Files\KiCad\6.0\share\kicad\scripting\plugins``
-或者 ``C:\Users\[your user Name]\Documents\KiCad\6.0\3rdparty\plugins`` 个人推荐放在后者路径下，方便迁移和备份。
+打包下载或者git clone到自己的kicad插件目录下（解压),刷新插件列表就行。
+以KiCad6.0为例，比如：``C:\Program Files\KiCad\6.0\share\kicad\scripting\plugins`` （取决于你的安装目录）
+或者 ``C:\Users\[your user Name]\Documents\KiCad\6.0\3rdparty\plugins`` 个人推荐放在后者路径下，方便迁移和备份。如果是KiCad7.0那么更换到对应的路径即可
+Linux下的路径位于
+~/.kicad/scripting/plugins
 
 剩下目测，因为目前就一个小窗口都写在上面了。有事儿提issue。
 
@@ -30,7 +33,8 @@ Kicad7.0已经集成了倒角（圆角功能，画框之后右键-圆角线）�
 
 输入框对奇奇怪怪的东西没有阻拦也没有异常处理，所以现阶段不要尝试输入数字以外的东西。以后会支持算式输入的。
 
-2、添加了可以在添加边框的时候一同添加尺寸标注，但是存在bug：
+2、这个插件我尝试实现了生成边框的同时标注外框尺寸，但是存在bug：
+
 添加之后尺寸不会自动显示，需要关闭pcbnew窗口后打开就会自动加载出来了；我不知道具体原因，我感觉我写的没问题，不过找到一个稍微方便一点的凑合用的方法：
 在尺寸标注上显示了一个test的文本，这个可以被显示出来，点一下它之后稍微拖动一下这个文本，尺寸标注就会自动加载出来了，拖动错位了也没关系，按一下ctrl+z就归位到正确的位置了。或者使用全选选中随便移动一下就能显示出来了（迷惑。。。。）
 
