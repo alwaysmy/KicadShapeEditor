@@ -22,7 +22,7 @@ Kicad7.0已经集成了倒角（圆角功能，画框之后右键-圆角线）�
 以KiCad6.0为例，比如：``C:\Program Files\KiCad\6.0\share\kicad\scripting\plugins`` （取决于你的安装目录）
 或者 ``C:\Users\[your user Name]\Documents\KiCad\6.0\3rdparty\plugins`` 个人推荐放在后者路径下，方便迁移和备份。如果是KiCad7.0那么更换到对应的路径即可
 Linux下的路径位于
-~/.kicad/scripting/plugins
+~/.local/share/kicad/scripting/plugins
 
 剩下目测，因为目前就一个小窗口都写在上面了。有事儿提issue。
 
