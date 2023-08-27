@@ -22,7 +22,7 @@ class MyDialog(wx.Dialog):
         self.button.SetPosition((110, 100))
         self.Bind(wx.EVT_BUTTON, self.on_button_clicked, self.button)
 
-    def on_button_clicked(self, event):
+    def on_button_clicked(self, event): 
         self.Close()
 
 class MyFrame(wx.Frame):
@@ -47,15 +47,9 @@ class MyFrame(wx.Frame):
         pass
 if __name__ == "__main__":
     app = wx.App()
-    # frame = MyFrame()
-    # testdlg = shape_para_set.MyDialog(None)
-    # testdlg.ShowModal()
-    # testdlg.Destroy()
-    # app.MainLoop()
     isDebug = True if sys.gettrace() else False
     if isDebug:
         # global boardobj
-        # pcbfile = r'C:\Users\Always\Desktop\dd\dd.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
         # boardobj=pcbnew.LoadBoard(pcbfile)
         dialog=shape_para_set.Dialog(None)
         dialog.Show()
