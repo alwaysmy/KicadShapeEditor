@@ -99,7 +99,7 @@ def pcbangle(ang):
 def mLoadBoard():
     isDebug = True if sys.gettrace() else False
     if isDebug:
-        pcbfile = r'D:\MyProjects\2_MyDesigns\SoftwareCodes\1_PluginsCodes\KiCadPlugins\TestKicadPrj\TestKicadPrj.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
+        pcbfile = r'./TestKicadPrj/TestKicadPrj.kicad_pcb'#没有特殊需求可以随便找一个pcb，直接放工程目录下也行
         boardobj=pcbnew.LoadBoard(pcbfile)
     else:
         boardobj = pcbnew.GetBoard()
@@ -432,6 +432,7 @@ def findNiceParams(boardobj):
 
 class Dialog(wx.Dialog):
     chsize = (10,20)#这个最好改掉，不能放到init里面，会失效
+    thisPlatform = sys.platform
     # Borderop = BoardOperation()
     # Borderop.onClickConfirmBtn()
     def __init__(self, parent):
@@ -451,9 +452,19 @@ class Dialog(wx.Dialog):
             tx=dc.GetTextExtent("M")
             # 将 chsize 全局变量的值
             #设置为字符宽度和高度的 1.5 倍。
-            chsize=(tx[0]*1.1,tx[1]*1.5)
-        def Em(x,y,dx=0,dy=0):
-            return (chsize[0]*x+dx, chsize[1]*y+dy)
+            if self.thisPlatform == 'win32':
+                x_extent = 1
+                y_extent = 1.5
+            elif self.thisPlatform == 'linux':
+                x_extent = 1
+                y_extent = 1
+            chsize=(tx[0]*x_extent,tx[1]*y_extent)
+            print(tx)
+        def  Em(x,y,dx=0,dy=0):
+
+            x = (int)(chsize[0]*x+dx)
+            y = (int)(chsize[1]*y+dy)
+            return (x, y)
         #-----------------------获取当前Kicad 版本号来调整API----------------
         global kicadVersionFlag
         kicadVersion = pcbnew.GetMajorMinorVersion()    # 获取住主要版本号 例如7.0
@@ -502,8 +513,8 @@ class Dialog(wx.Dialog):
         # wx.StaticText(self.panel, wx.ID_ANY, getstr('MENUFACTURERS'),size=Em(14,1), pos=Em(1,2.5))
         # wx.StaticText(self.panel, wx.ID_ANY, getstr('MENUFACTURERS'),size=Em(14,1), pos=Em(1,2.5))
         #if in chinese,四个选项包含
-        shapeList = ['矩形', '圆角矩形', '圆形','多边形导入'] 
-        shapeList = ['矩形', '圆角矩形', '圆形','脚本生成']#ScriptEdit
+        #shapeList = ['矩形', '圆角矩形', '圆形','多边形导入'] 
+        shapeList = ['矩形', '圆角矩形', '圆形','脚本生成'] #ScriptEdit
         self.theShapeSelection = 0
         self.lineWidth = 0.254 # mm 
         # self.lineWidth = 0.1 #mm
@@ -521,12 +532,15 @@ class Dialog(wx.Dialog):
         # ---输入数据单位可选，同时读取板设置自动选择mm mil
         #X坐标输入框
         self.PosX_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posX),pos=Em(2+2,5),size=Em(8,1),name='x')
+        #self.PosX_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posX),pos=(61.6,262.5),size=Em(8,1),name='x')
+        #TODO:在linux下这里的参数不能接受浮点数？？？？否则会归零
         #Y坐标输入框
         self.PosY_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(center_posY),pos=Em(14+2,5),size=Em(8,1),name='y')
 
         #X长度输入框
         #圆形的半径直接取上面的X
         self.length_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(X_length),pos=Em(2+2,7),size=Em(8,1),name='xl')
+        #self.length_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(X_length),pos=(60,100),size=Em(8,1),name='xl')
         #宽度输入框Y
         self.width_Input = wx.TextCtrl(self.panel,wx.ID_ANY,value=str(Y_length),pos=Em(14+2,7),size=Em(8,1),name='yl')
         # 圆角半径生成参数
