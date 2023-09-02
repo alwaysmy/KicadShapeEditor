@@ -12,7 +12,7 @@ import sys
 
 #---------------------TODO-list：========================
 # TODO：AddDimensionToBoard函数内一些写死的值改一下
-# TODO: 位置坐标分到一组，大小分为一组，位置坐标增加可选中心还是左上角为坐标点。
+# TODO: 增加小耳朵 方耳朵和圆耳朵
 # TODO: 增加选项，添加边框的时候删除原来的边框
 # TODO：添加高级选项功能--就是设置
 # TODO:添加更多选型，用来实现1可以填充为实心图形，2修改线宽 （线宽也放在高级编辑里面# 生成线宽可选
@@ -69,7 +69,7 @@ import sys
 # 1#原始问题：不知道为什么这样会算不出来宽度，也没报错就运行不了
 # 解决：--- 输入线宽需要是整数，已经修复，后续可以添加调整线宽的功能
 # 2修复了删除被添加的边框后被回显出来的bug（改dialog的显示方法为show而不是showModal，摸不着头脑
-# 但是保留刷新按键，方便一些别的改文件操作 TODO:实际上板子不重新打开pcbnew编辑器是不会从文件重新加载板子的，所以这里没用，起码refresh没用，去掉或者修改。
+# 但是保留刷新按键，方便一些别的改文件操作
 # 3 7.0中打开新菜单没问题
 # #-----其他记录---------------
 # 增加了一个layerDict用来存储当前板子的层的名称和序号，其实用不用无所谓，放着吧
@@ -323,6 +323,7 @@ def AddRoundShape(shape_radius,segmentWidth,x0,y0,chosenLayer,isFill=False,isLoc
 # 这个还没做TODO,添加用openscad描述的自定义形状（不实用）
 def AddScadShape(segmentWidth,chosenLayer):
     pass
+# 添加尺寸注释↓
 # 参数分别是 起始点 终点到x的距离和到y的距离（不是终点坐标）
 def AddDimensionToBoard(x0,y0,x1,y1,boardObj):
     # pcbnew.dim
@@ -368,15 +369,16 @@ def AddDimensionToBoard(x0,y0,x1,y1,boardObj):
         elif y1==0:
             dimensionObj.SetHeight(int(-4*g_multiplier))#向上边拓4mm
             dimText.SetPosition(pcbPos(x0,y0+8))
+            
 
     elif kicadVersionFlag ==7:
         dimensionObj.SetText("Test")
         if x1==0:
             dimensionObj.SetHeight(int(4*g_multiplier))#向左边拓4mm，如果是圆角矩形进动了，要加上半径
-            dimensionObj.SetTextPos(pcbPos(x0-8,y0))
+            dimensionObj.SetPosition(pcbPos(x0-8,y0))
         elif y1==0:
             dimensionObj.SetHeight(int(-4*g_multiplier))#向上边拓4mm
-            dimensionObj.SetTextPos(pcbPos(x0,y0+8))
+            dimensionObj.SetPosition(pcbPos(x0,y0+8))
             pass
 
     
@@ -451,11 +453,14 @@ class Dialog(wx.Dialog):
             # 获取 "M" 这个字符的宽和高
             tx=dc.GetTextExtent("M")
             # 将 chsize 全局变量的值
-            #设置为字符宽度和高度的 1.5 倍。
+            #Windows下设置为字符宽高度为1.5 倍。
             if self.thisPlatform == 'win32':
                 x_extent = 1
                 y_extent = 1.5
             elif self.thisPlatform == 'linux':
+                x_extent = 1
+                y_extent = 1
+            else:
                 x_extent = 1
                 y_extent = 1
             chsize=(tx[0]*x_extent,tx[1]*y_extent)

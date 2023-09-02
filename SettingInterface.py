@@ -1,11 +1,11 @@
 import wx
-import shape_para_set
+import shape_para_set as sps
 import sys
 import pcbnew
 
 class SettingDialog(wx.Dialog):
     def __init__(self, parent):
-        super().__init__(parent, title="My Dialog")
+        super().__init__(parent, title="Settings")
         self.SetSize((300, 200))
 
         # 创建一个静态文本控件用于显示提示信息
